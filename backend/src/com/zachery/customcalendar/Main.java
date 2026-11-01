@@ -115,7 +115,7 @@ public class Main
         get("/api/alarms", (req, res) -> {
             res.type("application/json");
             try {
-                return gson.toJson(dateAlarm.alarmDataList);
+                return gson.toJson(dateAlarm.getAlarms());
             } catch (@SuppressWarnings("TooBroadCatch") Exception e) {
                 LOGGER.log(Level.SEVERE, "GET /api/alarms failed", e);
                 res.status(500);
@@ -144,10 +144,26 @@ public class Main
             res.type("application/json");
             try {
                 AlarmRequest body = gson.fromJson(req.body(), AlarmRequest.class);
-                dateAlarm.removeAlarm(java.time.LocalDateTime.parse(body.time));
-                return gson.toJson(new MessageResponse("Alarm removed!"));
+                boolean removed = (body.id != null)
+                    ? dateAlarm.removeAlarm(body.id.longValue())
+                    : dateAlarm.removeAlarm(LocalDateTime.parse(body.time));
+                if (!removed) res.status(404);
+                return gson.toJson(new MessageResponse(removed ? "Alarm removed!" : "Alarm not found."));
             } catch (@SuppressWarnings("TooBroadCatch") Exception e) {
                 LOGGER.log(Level.SEVERE, "DELETE /api/alarms failed", e);
+                res.status(500);
+                return gson.toJson(new MessageResponse("Failed: " + e.getMessage()));
+            }
+        });
+
+        delete("/api/alarms/:id", (req, res) -> {
+            res.type("application/json");
+            try {
+                boolean removed = dateAlarm.removeAlarm(req.params(":id"));
+                if (!removed) res.status(404);
+                return gson.toJson(new MessageResponse(removed ? "Alarm removed!" : "Alarm not found."));
+            } catch (@SuppressWarnings("TooBroadCatch") Exception e) {
+                LOGGER.log(Level.SEVERE, "DELETE /api/alarms/:id failed", e);
                 res.status(500);
                 return gson.toJson(new MessageResponse("Failed: " + e.getMessage()));
             }
@@ -158,13 +174,14 @@ public class Main
             try {
                 String id = req.params(":id");
                 AlarmRequest body = gson.fromJson(req.body(), AlarmRequest.class);
-                dateAlarm.updateAlarm(
+                boolean updated = dateAlarm.updateAlarm(
                     id,
                     LocalDateTime.parse(body.time),
                     body.title,
                     body.desc
                 );
-                return gson.toJson(new MessageResponse("Alarm updated..."));
+                if (!updated) res.status(404);
+                return gson.toJson(new MessageResponse(updated ? "Alarm updated..." : "Alarm not found."));
             } catch (@SuppressWarnings("TooBroadCatch") Exception e) {
                 LOGGER.log(Level.SEVERE, "PUT /api/alarms/:id failed", e);
                 res.status(500);
@@ -366,6 +383,7 @@ public class Main
 
     static class AlarmRequest
     {
+        Long id;
         String time, title, desc;
     }
 

@@ -1,90 +1,119 @@
 package com.zachery.customcalendar;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.Scanner;
 
 public class DateAlarm
 {
-    PriorityQueue<AlarmRecord> alarmDataQueue = new PriorityQueue<>();
-    List<AlarmRecord> alarmDataList = new ArrayList<>();
+    private final PriorityQueue<AlarmRecord> alarmDataQueue = new PriorityQueue<>();
+    private final List<AlarmRecord> alarmDataList = new ArrayList<>();
+    private final Object lock = new Object();
 
+    private final Database db;
+    private final AlarmSounds alarmSounds;
     private Thread alarmThread = null;
-    private AlarmSounds alarmSounds;
 
-    public DateAlarm(AlarmSounds alarmSounds) throws IOException
+    public DateAlarm(AlarmSounds alarmSounds) throws Exception
     {
         this.alarmSounds = alarmSounds;
+        this.db = Database.get();
 
-        try (Scanner scan = getAllNotificationData())
+        synchronized (lock)
         {
-            while (scan.hasNextLine())
+            for (AlarmRecord alarm : db.loadAll())
             {
-                String line = scan.nextLine().trim();
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split("\\|&\\^");
-                if (parts.length < 2) continue;
-
-                LocalDateTime alarmTime = LocalDateTime.parse(parts[0]);
-
-                String title = parts[1].replace("<NL>", "\n");
-                String desc  = (parts.length > 2 ? parts[2] : "").replace("<aNL>", "\n");
-
-                AlarmRecord alarm = new AlarmRecord(alarmTime, title, desc);
-
                 alarmDataList.add(alarm);
 
-                if (alarmTime.isAfter(LocalDateTime.now()))
+                //only future alarms get scheduled at startup
+                if (alarm.time().isAfter(LocalDateTime.now()))
                     alarmDataQueue.add(alarm);
             }
         }
         checkAlarm();
     }
 
-    public void setAlarm(LocalDateTime time, String title, String desc) throws IOException
+    public List<AlarmRecord> getAlarms()
     {
-        String safeTitle = title.replace("\n", "<NL>");
-        String safeDesc  = desc.replace("\n", "<aNL>");
+        synchronized (lock) { return new ArrayList<>(alarmDataList); }
+    }
 
-        AlarmRecord alarm = new AlarmRecord(time, title, desc);
+    public void setAlarm(LocalDateTime time, String title, String desc) throws SQLException
+    {
+        AlarmRecord alarm = db.insert(time, title, desc);
 
-        alarmDataQueue.add(alarm);
-        alarmDataList.add(alarm);
-
-        try (FileWriter fw = new FileWriter(SystemDirectory.ObtainFile("Events/Events.txt"), true);
-             PrintWriter pw = new PrintWriter(fw))
+        synchronized (lock)
         {
-            pw.println(time + "|&^" + safeTitle + "|&^" + safeDesc);
+            alarmDataQueue.add(alarm);
+            alarmDataList.add(alarm);
         }
-
         checkAlarm();
     }
 
-    public void removeAlarm(LocalDateTime time) throws IOException
+    /** Exact delete by id. */
+    public boolean removeAlarm(long id) throws SQLException
     {
-        alarmDataQueue.removeIf(a -> a.time().equals(time));
-        alarmDataList.removeIf(a -> a.time().equals(time));
-
-        rewriteEventsFile();
+        boolean removed = db.delete(id);
+        synchronized (lock)
+        {
+            alarmDataQueue.removeIf(a -> a.id() == id);
+            alarmDataList.removeIf(a -> a.id() == id);
+        }
+        checkAlarm();
+        return removed;
     }
 
-    public void updateAlarm(String id, LocalDateTime newTime, String newTitle, String newDesc) throws IOException
+    /** Legacy delete by time: removes only the first alarm at that time. */
+    public boolean removeAlarm(LocalDateTime time) throws SQLException
     {
-        LocalDateTime oldTime = LocalDateTime.parse(id);
+        Long id = findIdByTime(time);
+        return id != null && removeAlarm(id);
+    }
 
-        alarmDataQueue.removeIf(a -> a.time().equals(oldTime));
-        alarmDataList.removeIf(a -> a.time().equals(oldTime));
+    /** Accepts a numeric id or an old-style time string. */
+    public boolean removeAlarm(String idOrTime) throws SQLException
+    {
+        Long id = resolveId(idOrTime);
+        return id != null && removeAlarm(id);
+    }
 
-        rewriteEventsFile();
+    public boolean updateAlarm(String idOrTime, LocalDateTime newTime, String newTitle, String newDesc) throws SQLException
+    {
+        Long id = resolveId(idOrTime);
+        if (id == null || !db.update(id, newTime, newTitle, newDesc))
+            return false;
 
-        setAlarm(newTime, newTitle, newDesc);
+        AlarmRecord updated = new AlarmRecord(id, newTime, newTitle, newDesc == null ? "" : newDesc);
+
+        synchronized (lock)
+        {
+            alarmDataQueue.removeIf(a -> a.id() == id);
+            alarmDataQueue.add(updated);
+
+            for (int i = 0; i < alarmDataList.size(); i++)
+                if (alarmDataList.get(i).id() == id) { alarmDataList.set(i, updated); break; }
+        }
+        checkAlarm();
+        return true;
+    }
+
+    private Long resolveId(String idOrTime)
+    {
+        try { return Long.parseLong(idOrTime); }
+        catch (NumberFormatException e) { return findIdByTime(LocalDateTime.parse(idOrTime)); }
+    }
+
+    private Long findIdByTime(LocalDateTime time)
+    {
+        synchronized (lock)
+        {
+            for (AlarmRecord a : alarmDataList)
+                if (a.time().equals(time)) return a.id();
+        }
+        return null;
     }
 
     public void checkAlarm()
@@ -101,11 +130,10 @@ public class DateAlarm
 
         alarmThread = new Thread(() ->
         {
-            System.out.println("=== THREAD STARTED, queue size: " + alarmDataQueue.size());
-
-            while (!Thread.currentThread().isInterrupted() && !alarmDataQueue.isEmpty())
+            while (!Thread.currentThread().isInterrupted())
             {
-                AlarmRecord nextAlarm = alarmDataQueue.peek();
+                AlarmRecord nextAlarm;
+                synchronized (lock) { nextAlarm = alarmDataQueue.peek(); }
                 if (nextAlarm == null) break;
 
                 long delayMs = Duration.between(LocalDateTime.now(), nextAlarm.time()).toMillis();
@@ -116,33 +144,31 @@ public class DateAlarm
                     if (delayMs > 0)
                         Thread.sleep(delayMs);
 
-                    System.out.println("=== SLEEP COMPLETE for: " + nextAlarm.title());
-
                     if (Thread.currentThread().isInterrupted())
                         return;
 
-                    AlarmRecord cannon = alarmDataQueue.poll();
+                    AlarmRecord cannon;
+                    synchronized (lock)
+                    {
+                        //edited/deleted/preempted while we slept? re-evaluate instead of firing
+                        if (alarmDataQueue.peek() != nextAlarm) continue;
+                        cannon = alarmDataQueue.poll();
+                    }
                     if (cannon == null) continue;
 
                     System.out.println("=== ALARM FIRING: " + cannon.title());
 
                     String selected = alarmSounds.getSelectedSound();
-                    System.out.println("=== Selected sound: " + selected);
-
                     AlarmActivation activation = new AlarmActivation(cannon.title(), cannon.desc());
 
                     Main.alarmFiring.set(true);
                     Main.firingTitle.set(cannon.title());
                     Main.firingDesc.set(cannon.desc());
 
-                    System.out.println("=== Calling displayTray...");
                     activation.displayTray();
 
-                    System.out.println("=== Calling playSound...");
                     String soundName = (selected != null && !selected.isEmpty()) ? selected : "chime";
                     alarmSounds.playSound(soundName);
-
-                    System.out.println("=== Done.");
                 }
                 catch (InterruptedException e)
                 {
@@ -155,37 +181,9 @@ public class DateAlarm
                     e.printStackTrace();
                 }
             }
-
-            System.out.println("=== THREAD EXITING, queue size: " + alarmDataQueue.size());
         });
 
         alarmThread.setDaemon(true);
         alarmThread.start();
-    }
-
-    private void rewriteEventsFile() throws IOException
-    {
-        java.io.File file = SystemDirectory.ObtainFile("Events/Events.txt");
-
-        try (PrintWriter pw = new PrintWriter(file))
-        {
-            for (AlarmRecord alarm : alarmDataList)
-            {
-                String safeTitle = alarm.title().replace("\n", "<NL>");
-                String safeDesc  = alarm.desc().replace("\n", "<aNL>");
-                pw.println(alarm.time() + "|&^" + safeTitle + "|&^" + safeDesc);
-            }
-        }
-    }
-
-    private Scanner getAllNotificationData() throws IOException
-    {
-        java.io.File file = SystemDirectory.ObtainFile("Events/Events.txt");
-        if (!file.exists())
-        {
-            file.getParentFile().mkdirs();
-            file.createNewFile();
-        }
-        return new Scanner(file);
     }
 }

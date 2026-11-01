@@ -62,3 +62,15 @@ Calisigh takes zero liability for your pointless events. Your choices are yours 
 <h2 align="center">License</h2>
 
 Unless specified otherwise, this repository is licensed under [AGPL-3.0](LICENSE)
+
+---
+
+<h2 align="center">Under the hood</h2>
+
+- **Alarms live in SQLite.** Database: `%APPDATA%\Calisigh\Database\Calisigh.db` (macOS: `~/Library/Application Support/Calisigh/Database/`, Linux: `~/.local/share/Calisigh/Database/`). Every alarm has a numeric `id`. On first launch an old `Events/Events.txt` is imported once and renamed `Events.txt.migrated`. The SQLite driver is bundled in the backend jar, so users install nothing.
+- **Holidays come from Calendarific.** One API call per year, then the result is cached in the same SQLite database, so each year is only fetched once. Offline, years you have already opened still show. You need your own free API key from [calendarific.com](https://calendarific.com): put it in `config.properties` in the Calisigh app-data folder (`%APPDATA%\Calisigh\` on Windows) as `calendarific.api.key=...`. The file is created on first launch.
+- **Building the backend:** `cd backend && mvn clean package`, then copy `target/CustomCalendar.jar` to `frontend/src-tauri/target/debug/` for local Tauri runs.
+
+<h2 align="center">Credits</h2>
+
+Holiday data by [Calendarific](https://calendarific.com).
