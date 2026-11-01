@@ -13,6 +13,9 @@ public class DateAlarm
     private final List<AlarmRecord> alarmDataList = new ArrayList<>();
     private final Object lock = new Object();
 
+    //how long the scheduler sleeps between wall-clock checks
+    private static final long MAX_SLEEP_SLICE_MS = 1000;
+
     private final Database db;
     private final AlarmSounds alarmSounds;
     private Thread alarmThread = null;
@@ -136,28 +139,39 @@ public class DateAlarm
                 synchronized (lock) { nextAlarm = alarmDataQueue.peek(); }
                 if (nextAlarm == null) break;
 
+                /*
+                Never do one long sleep for the whole wait. Thread.sleep() doesn't count time the
+                PC spends asleep/hibernating, so a single sleep(delayMs) wakes up late by however
+                long the machine was suspended. Sleep in short slices and re-check the wall clock
+                every time instead; the head of the queue is also re-read each slice, so edits and
+                earlier alarms are picked up without relying on the interrupt alone.
+                */
                 long delayMs = Duration.between(LocalDateTime.now(), nextAlarm.time()).toMillis();
-                System.out.println("=== Waiting " + delayMs + "ms for: " + nextAlarm.title());
+                if (delayMs > 0)
+                {
+                    try { Thread.sleep(Math.min(delayMs, MAX_SLEEP_SLICE_MS)); }
+                    catch (InterruptedException e)
+                    {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    continue;
+                }
+
+                AlarmRecord cannon;
+                synchronized (lock)
+                {
+                    //edited/deleted/preempted while we slept? re-evaluate instead of firing
+                    if (alarmDataQueue.peek() != nextAlarm) continue;
+                    cannon = alarmDataQueue.poll();
+                }
+                if (cannon == null) continue;
+
+                long lateMs = Duration.between(cannon.time(), LocalDateTime.now()).toMillis();
+                System.out.println("=== ALARM FIRING: " + cannon.title() + " (late by " + lateMs + "ms)");
 
                 try
                 {
-                    if (delayMs > 0)
-                        Thread.sleep(delayMs);
-
-                    if (Thread.currentThread().isInterrupted())
-                        return;
-
-                    AlarmRecord cannon;
-                    synchronized (lock)
-                    {
-                        //edited/deleted/preempted while we slept? re-evaluate instead of firing
-                        if (alarmDataQueue.peek() != nextAlarm) continue;
-                        cannon = alarmDataQueue.poll();
-                    }
-                    if (cannon == null) continue;
-
-                    System.out.println("=== ALARM FIRING: " + cannon.title());
-
                     String selected = alarmSounds.getSelectedSound();
                     AlarmActivation activation = new AlarmActivation(cannon.title(), cannon.desc());
 
@@ -165,15 +179,15 @@ public class DateAlarm
                     Main.firingTitle.set(cannon.title());
                     Main.firingDesc.set(cannon.desc());
 
-                    activation.displayTray();
+                    //a failed toast shouldn't also silence the sound
+                    try { activation.displayTray(); }
+                    catch (Exception e)
+                    {
+                        System.err.println("toast failed, playing the sound anyway. " + e.getMessage());
+                    }
 
                     String soundName = (selected != null && !selected.isEmpty()) ? selected : "chime";
                     alarmSounds.playSound(soundName);
-                }
-                catch (InterruptedException e)
-                {
-                    Thread.currentThread().interrupt();
-                    return;
                 }
                 catch (Exception e)
                 {

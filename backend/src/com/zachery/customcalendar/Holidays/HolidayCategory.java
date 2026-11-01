@@ -1,4 +1,4 @@
-package com.zachery.customcalendar.ObservationsHolidays;
+package com.zachery.customcalendar.Holidays;
 
 /**
  * Category labels applied to each {@link Holiday}. Constant names dropped the

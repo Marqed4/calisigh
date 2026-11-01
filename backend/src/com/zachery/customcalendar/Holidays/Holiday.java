@@ -1,4 +1,4 @@
-package com.zachery.customcalendar.ObservationsHolidays;
+package com.zachery.customcalendar.Holidays;
 
 import java.time.LocalDate;
 

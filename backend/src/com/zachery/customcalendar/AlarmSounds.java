@@ -1,15 +1,14 @@
 package com.zachery.customcalendar;
 
+import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -24,121 +23,78 @@ import javazoom.jl.decoder.Decoder;
 import javazoom.jl.decoder.Header;
 import javazoom.jl.decoder.SampleBuffer;
 
+/*
+The sound list, the selected sound and the volume live in SQLite now (sounds + settings tables).
+Uploaded files stay on disk under Calisigh/AlarmSounds/Uploads; the table keeps each file's path
+relative to the Calisigh folder. The API still hands out "name|&absolute path" strings.
+*/
 public class AlarmSounds
 {
+    private static final String SETTING_SELECTED = "selectedSound";
+    private static final String SETTING_VOLUME = "volume";
 
-    private static final String SELECTED_SOUND_FILE = "AlarmSounds/SelectedSound.txt";
-    private static final String VOLUME_FILE = "AlarmSounds/Volume.txt";
-
-    private List<String> entries = new ArrayList<>();
+    private final Database db;
     private Thread currentPlayback;
     private Clip currentClip;
     private SourceDataLine currentLine;
     private String selectedSound = null;
     private float volume = 1.0f;
 
-    public AlarmSounds()
+    public AlarmSounds() throws SQLException
     {
+        this.db = Database.get();
+        loadSelectedSound();
+        loadVolume();
+    }
+
+    private void loadSelectedSound() throws SQLException
+    {
+        String s = db.getSetting(SETTING_SELECTED);
+        selectedSound = (s == null || s.isBlank()) ? null : s;
+    }
+
+    private void loadVolume() throws SQLException
+    {
+        String s = db.getSetting(SETTING_VOLUME);
+        if (s == null) return;
+
         try {
-            loadSounds();
-            loadSelectedSound();
-            loadVolume();
-        } catch (IOException e) {
-            e.printStackTrace();
+            float val = Float.parseFloat(s.trim());
+            volume = Math.max(0f, Math.min(1f, val));
+        } catch (NumberFormatException e) {
+            volume = 1.0f;
         }
     }
 
-    private void loadSounds() throws IOException
+    public void addSound(String sourcePath) throws IOException, SQLException
     {
-        java.io.File file = SystemDirectory.Directory("AlarmSounds/AlarmSounds.txt");
-
-        if (!file.exists() || file.length() == 0)
-            return;
-
-        entries.clear();
-
-        try (Scanner scanner = new Scanner(file))
-        {
-            while (scanner.hasNextLine())
-            {
-                String line = scanner.nextLine().trim();
-                if (!line.isEmpty())
-                    entries.add(line);
-            }
-        }
-
-        Collections.sort(entries);
-    }
-
-    private void loadSelectedSound() throws IOException
-    {
-        java.io.File file = SystemDirectory.Directory(SELECTED_SOUND_FILE);
-
-        if (!file.exists() || file.length() == 0) return;
-
-        try (Scanner scanner = new Scanner(file))
-        {
-            if (scanner.hasNextLine())
-            {
-                String line = scanner.nextLine().trim();
-                selectedSound = line.isEmpty() ? null : line;
-            }
-        }
-    }
-
-    private void loadVolume() throws IOException
-    {
-        java.io.File file = SystemDirectory.Directory(VOLUME_FILE);
-
-        if (!file.exists() || file.length() == 0) return;
-
-        try (Scanner scanner = new Scanner(file))
-        {
-            if (scanner.hasNextLine())
-            {
-                try {
-                    float val = Float.parseFloat(scanner.nextLine().trim());
-                    volume = Math.max(0f, Math.min(1f, val));
-                } catch (NumberFormatException e) {
-                    volume = 1.0f;
-                }
-            }
-        }
-    }
-
-    public void addSound(String sourcePath) throws IOException
-    {
-        java.io.File sourceFile = new java.io.File(sourcePath);
+        File sourceFile = new File(sourcePath);
 
         if (!sourceFile.exists())
             throw new IOException("Source file does not exist: " + sourcePath);
 
         String fileName = sourceFile.getName();
-        String ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+        int dot = fileName.lastIndexOf('.');
+        String ext = dot < 0 ? "" : fileName.substring(dot).toLowerCase();
 
         if (!ext.equals(".mp3") && !ext.equals(".wav"))
             throw new IOException("Unsupported file type: " + ext);
 
-        String displayName = fileName.substring(0, fileName.lastIndexOf('.'));
+        String displayName = fileName.substring(0, dot);
 
-        java.io.File destFile = SystemDirectory.ObtainFile("AlarmSounds/Uploads/" + fileName);
+        File destFile = SystemDirectory.Directory("AlarmSounds/Uploads/" + fileName);
+
+        //names are unique now; same name pointing at a different file would be silently ignored otherwise
+        Database.MediaRow existing = db.findMedia(Database.SOUNDS, displayName);
+        if (existing != null
+            && !Database.fromStoredPath(existing.path()).getAbsoluteFile().equals(destFile.getAbsoluteFile()))
+            throw new IOException("A sound named \"" + displayName + "\" already exists");
+
         destFile.getParentFile().mkdirs();
-
         Files.copy(sourceFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-        String entry = displayName + "|&" + destFile.getAbsolutePath();
-
-        if (entries.contains(entry))
-            return;
-
-        entries.add(entry);
-        Collections.sort(entries);
-
-        try (FileWriter fw = new FileWriter(SystemDirectory.ObtainFile("AlarmSounds/AlarmSounds.txt"), true);
-             PrintWriter pw = new PrintWriter(fw))
-        {
-            pw.println(entry);
-        }
+        if (existing == null)
+            db.addMedia(Database.SOUNDS, displayName, Database.toStoredPath(destFile));
     }
 
     public void playSound(String name)
@@ -149,25 +105,21 @@ public class AlarmSounds
             return;
         }
 
-        String filePath = null;
-
-        for (String entry : entries)
-        {
-            String[] parts = entry.split("\\|&", 2);
-            if (parts.length == 2 && parts[0].equals(name))
-            {
-                filePath = parts[1];
-                break;
-            }
+        Database.MediaRow row;
+        try {
+            row = db.findMedia(Database.SOUNDS, name);
+        } catch (SQLException e) {
+            System.err.println("couldn't look up the sound. the database is sulking. " + e.getMessage());
+            return;
         }
 
-        if (filePath == null)
+        if (row == null)
         {
             System.out.println("Sound not found: " + name);
             return;
         }
 
-        playSoundFile(filePath);
+        playSoundFile(Database.fromStoredPath(row.path()).getAbsolutePath());
     }
 
     private void playSoundFile(String filePath)
@@ -176,8 +128,8 @@ public class AlarmSounds
 
         try
         {
-            java.io.File soundFile = (filePath != null && !filePath.isEmpty())
-                ? new java.io.File(filePath)
+            File soundFile = (filePath != null && !filePath.isEmpty())
+                ? new File(filePath)
                 : SystemDirectory.Directory("resources/assets/sounds/Default Chime.mp3");
 
             if (!soundFile.exists())
@@ -190,12 +142,12 @@ public class AlarmSounds
 
             if (name.endsWith(".mp3"))
             {
-                java.io.File ref = soundFile;
+                File ref = soundFile;
                 currentPlayback = new Thread(() -> playMp3(ref));
             }
             else if (name.endsWith(".wav"))
             {
-                java.io.File ref = soundFile;
+                File ref = soundFile;
                 currentPlayback = new Thread(() -> playWav(ref));
             }
             else
@@ -213,7 +165,7 @@ public class AlarmSounds
         }
     }
 
-    private void playMp3(java.io.File file)
+    private void playMp3(File file)
     {
         try (FileInputStream fis = new FileInputStream(file))
         {
@@ -286,7 +238,7 @@ public class AlarmSounds
         }
     }
 
-    private void playWav(java.io.File file)
+    private void playWav(File file)
     {
         try (AudioInputStream ais = AudioSystem.getAudioInputStream(file))
         {
@@ -377,48 +329,24 @@ public class AlarmSounds
         }
     }
 
-    public void removeSound(String name) throws IOException
+    public void removeSound(String name) throws IOException, SQLException
     {
-        String entryToRemove = null;
+        Database.MediaRow row = db.findMedia(Database.SOUNDS, name);
 
-        for (String entry : entries)
-        {
-            String[] parts = entry.split("\\|&", 2);
-            if (parts.length == 2 && parts[0].equals(name))
-            {
-                entryToRemove = entry;
-                break;
-            }
-        }
-
-        if (entryToRemove == null)
+        if (row == null)
         {
             System.out.println("Sound not found: " + name);
             return;
         }
 
-        String filePath = entryToRemove.split("\\|&", 2)[1];
-        java.io.File uploadedFile = new java.io.File(filePath);
-
+        File uploadedFile = Database.fromStoredPath(row.path());
         if (uploadedFile.exists())
             uploadedFile.delete();
 
-        entries.remove(entryToRemove);
-        rewriteSoundsFile();
+        db.removeMedia(Database.SOUNDS, name);
     }
 
-    private void rewriteSoundsFile() throws IOException
-    {
-        java.io.File file = SystemDirectory.ObtainFile("AlarmSounds/AlarmSounds.txt");
-
-        try (PrintWriter pw = new PrintWriter(new FileWriter(file, false)))
-        {
-            for (String entry : entries)
-                pw.println(entry);
-        }
-    }
-
-    public void setVolume(float vol) throws IOException
+    public void setVolume(float vol) throws SQLException
     {
         volume = Math.max(0f, Math.min(1f, vol));
 
@@ -429,11 +357,7 @@ public class AlarmSounds
                 applyVolumeToLine(currentLine, volume);
         }
 
-        java.io.File file = SystemDirectory.ObtainFile(VOLUME_FILE);
-        try (PrintWriter pw = new PrintWriter(new FileWriter(file, false)))
-        {
-            pw.println(volume);
-        }
+        db.setSetting(SETTING_VOLUME, String.valueOf(volume));
     }
 
     public float getVolume()
@@ -441,9 +365,15 @@ public class AlarmSounds
         return volume;
     }
 
-    public List<String> getAllSounds()
+    /** "name|&absolute path" strings, sorted, same shape the frontend always got. */
+    public List<String> getAllSounds() throws SQLException
     {
-        return Collections.unmodifiableList(entries);
+        List<String> out = new ArrayList<>();
+        for (Database.MediaRow r : db.listMedia(Database.SOUNDS))
+            out.add(r.name() + "|&" + Database.fromStoredPath(r.path()).getAbsolutePath());
+
+        Collections.sort(out);
+        return out;
     }
 
     public static String getDisplayName(String entry)
@@ -457,15 +387,10 @@ public class AlarmSounds
         return parts.length == 2 ? parts[1] : "";
     }
 
-    public void selectSound(String name) throws IOException
+    public void selectSound(String name) throws SQLException
     {
         selectedSound = (name == null || name.isEmpty()) ? null : name;
-
-        java.io.File file = SystemDirectory.ObtainFile(SELECTED_SOUND_FILE);
-        try (PrintWriter pw = new PrintWriter(new FileWriter(file, false)))
-        {
-            pw.println(selectedSound == null ? "" : selectedSound);
-        }
+        db.setSetting(SETTING_SELECTED, selectedSound);
     }
 
     public String getSelectedSound()

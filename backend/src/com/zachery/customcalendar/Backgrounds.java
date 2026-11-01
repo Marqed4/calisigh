@@ -1,41 +1,26 @@
 package com.zachery.customcalendar;
 
-import com.google.gson.*;
-import java.io.*;
-import java.nio.file.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/*
+Background list lives in SQLite now (backgrounds table). Uploaded images stay on disk under
+Calisigh/Backgrounds/Uploads; the table keeps each file's path relative to the Calisigh folder.
+The API still hands out "name|&absolute path" strings with forward slashes.
+*/
 public class Backgrounds {
-    private final List<String> entries = new ArrayList<>();
+    private final Database db;
 
-    public Backgrounds() {
-        try {
-            loadBackgrounds();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public Backgrounds() throws SQLException {
+        this.db = Database.get();
     }
 
-    private void loadBackgrounds() throws IOException {
-        File file = SystemDirectory.ObtainFile("Backgrounds/Backgrounds.json");
-        if (!file.exists()) {
-            file.getParentFile().mkdirs();
-            return;
-        }
-
-        String json = new String(Files.readAllBytes(file.toPath()));
-        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-
-        for (JsonElement el : arr) {
-            JsonObject obj = el.getAsJsonObject();
-            String name = obj.get("name").getAsString();
-            String path = obj.get("path").getAsString();
-            entries.add(name + "|&" + path);
-        }
-    }
-
-    public void addBackground(String sourcePath) throws IOException {
+    public void addBackground(String sourcePath) throws IOException, SQLException {
         File sourceFile = new File(sourcePath);
         if (!sourceFile.exists())
             throw new IOException("Source file does not exist: " + sourcePath);
@@ -46,58 +31,33 @@ public class Backgrounds {
                 : fileName;
 
         // Skip if already exists
-        if (findEntry(displayName) != null) return;
+        if (db.findMedia(Database.BACKGROUNDS, displayName) != null) return;
 
-        File destFile = SystemDirectory.ObtainFile("Backgrounds/Uploads/" + fileName);
+        File destFile = SystemDirectory.Directory("Backgrounds/Uploads/" + fileName);
         destFile.getParentFile().mkdirs();
         Files.copy(sourceFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-        entries.add(displayName + "|&" + destFile.getAbsolutePath().replace("\\", "/"));
-        saveBackgrounds();
+        db.addMedia(Database.BACKGROUNDS, displayName, Database.toStoredPath(destFile));
     }
 
-    public void removeBackground(String name) throws IOException {
-        String entry = findEntry(name);
-        if (entry == null) {
+    public void removeBackground(String name) throws SQLException {
+        Database.MediaRow row = db.findMedia(Database.BACKGROUNDS, name);
+        if (row == null) {
             System.out.println("Background not found: " + name);
             return;
         }
 
-        String filePath = Backgrounds.getFilePath(entry);
-        File uploadedFile = new File(filePath);
+        File uploadedFile = Database.fromStoredPath(row.path());
         if (uploadedFile.exists()) uploadedFile.delete();
 
-        entries.remove(entry);
-        saveBackgrounds();
+        db.removeMedia(Database.BACKGROUNDS, name);
     }
 
-    private String findEntry(String name) {
-        for (String entry : entries) {
-            if (getDisplayName(entry).equals(name)) return entry;
-        }
-        return null;
-    }
-
-    private void saveBackgrounds() throws IOException {
-        File file = SystemDirectory.ObtainFile("Backgrounds/Backgrounds.json");
-        file.getParentFile().mkdirs();
-
-        JsonArray arr = new JsonArray();
-        for (String entry : entries) {
-            JsonObject obj = new JsonObject();
-            obj.addProperty("name", getDisplayName(entry));
-            obj.addProperty("path", getFilePath(entry));
-            arr.add(obj);
-        }
-
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (PrintWriter pw = new PrintWriter(new FileWriter(file))) {
-            pw.print(gson.toJson(arr));
-        }
-    }
-
-    public List<String> getAllBackgrounds() {
-        return entries;
+    public List<String> getAllBackgrounds() throws SQLException {
+        List<String> out = new ArrayList<>();
+        for (Database.MediaRow r : db.listMedia(Database.BACKGROUNDS))
+            out.add(r.name() + "|&" + Database.fromStoredPath(r.path()).getAbsolutePath().replace("\\", "/"));
+        return out;
     }
 
     public static String getDisplayName(String entry) {
