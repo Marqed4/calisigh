@@ -5,6 +5,7 @@ import { isRangeSet, rangeLabel, readRange } from "../lib/alarmRange.js";
 import { alarms as alarmsApi, chat } from "../lib/api.js";
 import { loadAlarmContext } from "../lib/chatContext.js";
 import { notifyAlarmsChanged } from "../lib/windows.js";
+import EventCard from "./EventCard.jsx";
 import ModelPicker from "./ModelPicker.jsx";
 import "./Chat.css";
 
@@ -144,11 +145,15 @@ export default function Chat() {
     setLoading(false);
   };
 
-  /* The assistant's occasional event idea becomes a real alarm */
+  /* An event the assistant proposed becomes a real alarm, its considerations saved as the description */
   async function addSuggestion(index) {
     const { suggestion } = messages[index];
     try {
-      await alarmsApi.create({ time: suggestion.time, title: suggestion.title, desc: "Suggested in chat" });
+      await alarmsApi.create({
+        time: suggestion.time,
+        title: suggestion.title,
+        desc: (suggestion.notes ?? []).map(note => `- ${note}`).join("\n"),
+      });
       await notifyAlarmsChanged();
       setMessages(prev => prev.map((m, i) => (i === index ? { ...m, added: true } : m)));
     } catch (_) {}
@@ -242,9 +247,7 @@ export default function Chat() {
                   {msg.content}
                 </div>
                 {msg.suggestion && (
-                  <button className="btn chat-suggestion" disabled={msg.added} onClick={() => addSuggestion(i)}>
-                    {msg.added ? "Added to your calendar" : `Add "${msg.suggestion.title}" (${new Date(msg.suggestion.time).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })})`}
-                  </button>
+                  <EventCard proposal={msg.suggestion} added={msg.added} onAdd={() => addSuggestion(i)} />
                 )}
               </div>
             ))}

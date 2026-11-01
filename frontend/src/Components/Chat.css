@@ -188,12 +188,6 @@
   gap: 6px;
 }
 
-.chat-suggestion {
-  align-self: flex-start;
-  max-width: 82%;
-  text-align: left;
-  font-size: 0.8rem;
-}
 
 /* Guitar on the send button */
 .guitar-icon {
@@ -241,4 +235,38 @@
 
 .chat-model-error {
   color: var(--danger);
+}
+
+/* Event the assistant proposes */
+.event-card {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 86%;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+}
+
+.event-card-title {
+  font-size: 0.9rem;
+}
+
+.event-card-when {
+  color: var(--text-dim);
+}
+
+.event-card-notes {
+  margin: 4px 0;
+  padding-left: 18px;
+  color: var(--text-dim);
+}
+
+.event-card .btn {
+  align-self: flex-start;
+  margin-top: 4px;
 }

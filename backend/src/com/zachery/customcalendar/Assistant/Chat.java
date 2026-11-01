@@ -4,12 +4,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.google.gson.Gson;
 
@@ -18,9 +14,6 @@ import static spark.Spark.post;
 public class Chat {
 
     private static final String OLLAMA_URL = "http://localhost:11434/api/chat";
-
-    private static final Pattern EVENT_TAG = Pattern.compile(
-        "\\[\\[EVENT:\\s*(.+?)\\s*\\|\\s*(\\d{4}-\\d{2}-\\d{2})\\s*\\|\\s*(\\d{1,2}:\\d{2})\\s*\\]\\]");
 
     private final Gson gson = new Gson();
     private final HttpClient http = HttpClient.newHttpClient();
@@ -104,21 +97,10 @@ public class Chat {
         return ollamaRes.message.content;
     }
 
-    // Pulls the [[EVENT: title | date | time]] tag out of a reply; a bad or past tag is dropped
     private ChatReply readReply(String content) {
-        Matcher m = EVENT_TAG.matcher(content);
-        ChatReply reply = new ChatReply(content.replaceAll("\\[\\[EVENT:[^\\]]*\\]\\]", "").strip());
-        if (m.reset().find()) {
-            try {
-                LocalDateTime when = LocalDateTime.of(LocalDate.parse(m.group(2)), LocalTime.parse(
-                    m.group(3).length() == 4 ? "0" + m.group(3) : m.group(3)));
-                if (when.isAfter(LocalDateTime.now())) {
-                    reply.suggestion = new Suggestion(m.group(1), when.toString());
-                }
-            } catch (java.time.format.DateTimeParseException ignored) {
-                // the model got the format wrong, so there is just no button
-            }
-        }
+        EventTag.Result result = EventTag.extract(content, LocalDateTime.now());
+        ChatReply reply = new ChatReply(result.text());
+        reply.suggestion = result.proposal();
         return reply;
     }
 
@@ -134,19 +116,12 @@ public class Chat {
             "their goals, events, schedules, reminders, or anything calendar-related. Sometimes you will even ask them about " +
             "their emotions and you'll randomly recommend cool midwestern emo songs that can be found within the company " +
             "library, be concise and midwestern emo. You're kind of like Rodrick from diary of a wimpy kid... if was a Midwestern-emo girl!";
-        systemPrompt += " Rules: only talk about events that appear in the calendar information above. " +
+        systemPrompt += " Rules: only talk about events that appear in the calendar information above, except new events the user asks you to create. " +
             "Never make up events, times or dates, and never list events from another day when asked about one day. " +
             "If there is nothing on a day, say so. Write plain text with no markdown, no asterisks and no bullet symbols, " +
             "and keep replies short.";
 
-        if (suggest) {
-            LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-            systemPrompt += " Right now it is " + now + " (" + now.getDayOfWeek() + "). " +
-                "In this reply, after answering, casually suggest ONE new calendar event the user could add. " +
-                "Base it on what you two have talked about or on gaps in their calendar, make it a future date, " +
-                "and keep the suggestion to one sentence in your voice. Then end the reply with this exact line: " +
-                "[[EVENT: <short title> | <YYYY-MM-DD> | <HH:mm>]]";
-        }
+        systemPrompt += EventTag.instructions(LocalDateTime.now(), suggest);
 
         StringBuilder messages = new StringBuilder("[");
         messages.append("{\"role\":\"system\",\"content\":").append(gson.toJson(systemPrompt)).append("}");
@@ -173,14 +148,9 @@ public class Chat {
 
     static class ChatReply {
         String reply;
-        Suggestion suggestion;
+        EventTag.Proposal suggestion;
         SuggestionPacer.Metrics metrics;
         ChatReply(String r) { this.reply = r; }
-    }
-
-    static class Suggestion {
-        String title, time;
-        Suggestion(String title, String time) { this.title = title; this.time = time; }
     }
 
     static class OllamaResponse {
