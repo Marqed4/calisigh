@@ -1,30 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { GUITARS, guitarStyle, nextGuitar } from "../lib/guitars.js";
 import { getBackground } from "../lib/backgrounds.js";
-import { isRangeSet, rangeLabel, rangeQuery, readRange } from "../lib/alarmRange.js";
+import { isRangeSet, rangeLabel, readRange } from "../lib/alarmRange.js";
 import { alarms as alarmsApi, chat } from "../lib/api.js";
+import { loadAlarmContext } from "../lib/chatContext.js";
 import { notifyAlarmsChanged } from "../lib/windows.js";
 import ModelPicker from "./ModelPicker.jsx";
 import "./Chat.css";
 
 const FALLBACK_GREETING = "Hey... like, what do you want?";
-
-async function fetchAlarms(range) {
-  try {
-    return await alarmsApi.list(rangeQuery(range));
-  } catch (_) {
-    return [];
-  }
-}
-
-function buildAlarmContext(alarms, range) {
-  const scope = isRangeSet(range) ? ` (limited to ${rangeLabel(range)})` : "";
-  return alarms.length > 0
-    ? `The user's calendar events${scope} are: ${alarms.map(a =>
-        `"${a.title}" at ${new Date(a.time).toLocaleString()}${a.desc ? ` (${a.desc})` : ""}`
-      ).join("; ")}.`
-    : `The user has no calendar events${scope}.`;
-}
 
 function sessionDate(iso) {
   return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -71,8 +55,7 @@ export default function Chat() {
     const range = readRange();
     let reply = FALLBACK_GREETING;
     try {
-      const alarms = await fetchAlarms(range);
-      const data = await chat.greeting(buildAlarmContext(alarms, range));
+      const data = await chat.greeting(await loadAlarmContext(range));
       reply = data.reply ?? FALLBACK_GREETING;
     } catch (_) {}
     setMessages([{ role: "assistant", content: reply }]);
@@ -151,8 +134,7 @@ export default function Chat() {
     try {
       /* Read fresh so main-window changes apply right away */
       const range = readRange();
-      const alarms = await fetchAlarms(range);
-      const data = await chat.reply({ sessionId: id, alarmContext: buildAlarmContext(alarms, range), messages: newMessages });
+      const data = await chat.reply({ sessionId: id, alarmContext: await loadAlarmContext(range), messages: newMessages });
       const reply = data.reply ?? "...whatever, I got nothing. Try again I guess.";
       setMessages(prev => [...prev, { role: "assistant", content: reply, suggestion: data.suggestion }]);
       if (id !== null) saveMessage(id, "assistant", reply);

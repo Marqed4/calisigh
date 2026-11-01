@@ -8,6 +8,7 @@ import { saveBackground, savedBgKey } from "../lib/backgrounds.js";
 import { appearance, holidayToggles } from "../lib/settings.js";
 import { closeThisWindow } from "../lib/windows.js";
 import { applyFont, listFonts, saveFont, savedFont } from "../lib/fonts.js";
+import { FINISHES, SWATCHES, applyTrim, saveTrim, savedTrim } from "../lib/trim.js";
 import "./Settings.css";
 
 const BG_MAP = [
@@ -31,6 +32,14 @@ export default function Settings() {
   const flip = (name) => setToggles(t => ({ ...t, [name]: !t[name] }));
   const [font, setFont] = useState(savedFont);
   const [fonts, setFonts] = useState([]);
+  const [trim, setTrim] = useState(savedTrim);
+
+  /* Preview a trim change right away; Cancel puts the saved one back */
+  function changeTrim(change) {
+    const next = { ...trim, ...change };
+    setTrim(next);
+    applyTrim(next);
+  }
   const [look, setLook] = useState(appearance.read);
   const [customBackgrounds, setCustomBackgrounds] = useState([]);
   const [customSounds, setCustomSounds] = useState([]);
@@ -171,6 +180,7 @@ export default function Settings() {
     holidayToggles.write(toggles);
     appearance.write(look);
     saveFont(font);
+    saveTrim(trim);
     try {
       await sounds.select(selectedSound ?? "");
       await stopSound();
@@ -180,6 +190,7 @@ export default function Settings() {
 
   async function handleCancel() {
     applyFont();
+    applyTrim();
     await stopSound();
     await closeThisWindow();
   }
@@ -246,6 +257,42 @@ export default function Settings() {
                 {fonts.map(f => <option key={f} value={f} />)}
               </datalist>
               {font && <button className="settings-font-reset" onClick={() => { setFont(""); applyFont(""); }}>Default</button>}
+            </div>
+
+            <div className="settings-trim">
+              <span className="settings-toggle-label">Trim finish and colour</span>
+              <div className="segmented" role="tablist" aria-label="Trim finish">
+                {FINISHES.map(f => (
+                  <button
+                    key={f.key}
+                    role="tab"
+                    aria-selected={trim.finish === f.key}
+                    className={`segmented-btn${trim.finish === f.key ? " segmented-active" : ""}`}
+                    onClick={() => changeTrim({ finish: f.key })}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="settings-swatches">
+                {SWATCHES.map(sw => (
+                  <button
+                    key={sw.color}
+                    className={`settings-swatch${trim.color.toLowerCase() === sw.color ? " settings-swatch-active" : ""}`}
+                    style={{ background: sw.color }}
+                    title={sw.label}
+                    aria-label={sw.label}
+                    onClick={() => changeTrim({ color: sw.color })}
+                  />
+                ))}
+                <input
+                  className="settings-color"
+                  type="color"
+                  value={trim.color}
+                  title="Pick any colour"
+                  onChange={e => changeTrim({ color: e.target.value })}
+                />
+              </div>
             </div>
 
             <div className="settings-toggle-row">

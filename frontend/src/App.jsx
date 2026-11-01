@@ -7,10 +7,12 @@ import Settings from "./Components/Settings.jsx";
 import ViewChatAssistant from "./Components/Chat.jsx";
 import ViewEditAlarm from "./Components/ViewEditAlarm.jsx";
 import { keepFontApplied } from "./lib/fonts.js";
+import { keepTrimApplied } from "./lib/trim.js";
 import "./App.css";
 
 export default function App() {
   useEffect(keepFontApplied, []);
+  useEffect(keepTrimApplied, []);
 
   useEffect(() => {
     import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {

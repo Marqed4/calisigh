@@ -27,3 +27,16 @@ export function repeatIsos({ year, month, day, time, endDate, mode, cap = 520 })
   }
   return out;
 }
+
+/* Alarms with the same time, title and description are one event to the user */
+export const alarmKey = (a) => `${a.time}|${a.title}|${a.desc ?? ""}`;
+
+export function dedupeAlarms(list) {
+  const seen = new Set();
+  return list.filter(a => {
+    const key = alarmKey(a);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
