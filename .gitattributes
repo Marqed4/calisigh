@@ -1,0 +1,23 @@
+# Normalize line endings so CRLF/LF rewrites stop showing up as whole-file diffs
+* text=auto
+
+# Scripts that must keep their line endings on every OS
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binary assets: never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.webp binary
+*.mp3 binary
+*.wav binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.db binary
