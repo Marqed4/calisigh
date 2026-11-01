@@ -16,8 +16,8 @@
         "title": "Calisigh",
         "width": 950,
         "height": 650,
-        "minWidth": 660,
-        "minHeight": 440,
+        "minWidth": 820,
+        "minHeight": 520,
         "maxWidth": 1130,
         "maxHeight": 800,
         "visible": false,
@@ -38,7 +38,12 @@
   "bundle": {
     "publisher": "Marqed",
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/hooks.nsh"
+      }
+    },
     "resources": {
       "../../backend/target/CustomCalendar.jar": "CustomCalendar.jar",
       "resources/temurin-21-jre.msi": "temurin-21-jre.msi",

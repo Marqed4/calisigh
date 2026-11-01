@@ -1,4 +1,4 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Storage;
 
 import java.io.File;
 
@@ -22,7 +22,7 @@ public class SystemDirectory
         return new File(workingDirectory, filePath);
     }
 
-    protected static File ObtainFile(String requestedPath)
+    public static File ObtainFile(String requestedPath)
     {
         try 
         {
@@ -45,7 +45,7 @@ public class SystemDirectory
         }
     }
 
-    protected static File importSound(File sourceFile) throws Exception
+    public static File importSound(File sourceFile) throws Exception
     {
         if (!sourceFile.exists())
             throw new IllegalArgumentException("Source file does not exist: " + sourceFile.getAbsolutePath());
@@ -63,6 +63,40 @@ public class SystemDirectory
         );
 
         System.out.println("Imported sound: " + dest.getAbsolutePath() + " (" + dest.length() + " bytes)");
+        return dest;
+    }
+
+    // Copies a picture into Calisigh/Images/Uploads and returns the copy. Files already under the
+    // Calisigh folder (for example when an undo re-posts a deleted alarm) are used as they are.
+    public static File importImage(File sourceFile)
+    {
+        if (!sourceFile.isFile())
+            throw new IllegalArgumentException("Picture does not exist: " + sourceFile.getAbsolutePath());
+
+        String name = sourceFile.getName().toLowerCase();
+        if (!name.matches(".*\\.(png|jpe?g|gif|webp)$"))
+            throw new IllegalArgumentException("Pictures must be png, jpg, gif or webp.");
+
+        if (!Database.toStoredPath(sourceFile).equals(sourceFile.getAbsolutePath()))
+            return sourceFile;
+
+        File dest = Directory("Images/Uploads/" + System.currentTimeMillis() + "-" + sourceFile.getName());
+        dest.getParentFile().mkdirs();
+        try
+        {
+            // repeating an alarm posts the same picture many times; reuse an identical copy
+            File[] existing = dest.getParentFile().listFiles();
+            if (existing != null)
+                for (File f : existing)
+                    if (f.length() == sourceFile.length() && java.nio.file.Files.mismatch(f.toPath(), sourceFile.toPath()) == -1)
+                        return f;
+
+            java.nio.file.Files.copy(sourceFile.toPath(), dest.toPath());
+        }
+        catch (java.io.IOException e)
+        {
+            throw new RuntimeException("Could not copy picture: " + e.getMessage(), e);
+        }
         return dest;
     }
 

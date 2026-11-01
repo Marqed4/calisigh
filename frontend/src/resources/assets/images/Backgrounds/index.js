@@ -6,6 +6,9 @@ import Summer from './Summer.png'
 import Tree from './Tree.png'
 import Winter from './Winter.png'
 import Fall from './Fall.gif'
+import Sandstone from './Sandstone.jpg'
+import PaleStone from './PaleStone.jpg'
+import PlasterWall from './PlasterWall.jpg'
 
 export const DefaultBackgrounds = {
   Barn: Barn,
@@ -16,4 +19,7 @@ export const DefaultBackgrounds = {
   Tree: Tree,
   Winter: Winter,
   Fall: Fall,
+  Sandstone: Sandstone,
+  PaleStone: PaleStone,
+  PlasterWall: PlasterWall,
 }

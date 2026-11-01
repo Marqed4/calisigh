@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { emit } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { getBackground } from "./backgrounds.js";
-import { repeatIsos } from "./alarmUtils.js";
-import "./AddAlarm.css";
-import "./ViewEditAlarm.css"; /* reuses the repeat toggle + panel styles */
+import PicturePicker from "./PicturePicker.jsx";
+import { alarms } from "../lib/api.js";
+import { closeThisWindow, finishAlarmEdit } from "../lib/windows.js";
+import { getBackground } from "../lib/backgrounds.js";
+import { repeatIsos } from "../lib/alarmUtils.js";
+import "./AlarmWindow.css";
 
 export default function AddAlarm() {
-  // Pull the date from the query params passed when the window was opened
   const params = new URLSearchParams(window.location.search);
   const day = params.get("day");
   const month = params.get("month");
@@ -19,19 +18,14 @@ export default function AddAlarm() {
   const [error, setError] = useState("");
   const [repeatMode, setRepeatMode] = useState("none"); // none | weekly | yearly
   const [endDate, setEndDate] = useState("");
+  const [imagePath, setImagePath] = useState("");
   const titleRef = useRef(null);
 
   const bg = getBackground();
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
-  async function post(iso) {
-    await fetch("http://localhost:4567/api/alarms", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ time: iso, title, desc }),
-    });
-  }
+  const post = (iso) => alarms.create({ time: iso, title, desc, imageSource: imagePath });
 
   async function saveAlarm() {
     if (!title || !time) {
@@ -43,7 +37,6 @@ export default function AddAlarm() {
       return;
     }
 
-    // Build the ISO timestamp from the date params and the time input
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}:00`;
 
     try {
@@ -53,19 +46,17 @@ export default function AddAlarm() {
           await post(next);
         }
       }
-      // Tell Home.jsx to reload its alarms, then close this window
-      await emit("alarm-saved");
-      await getCurrentWindow().close();
+      await finishAlarmEdit();
     } catch (err) {
       setError("Failed to save alarm. Is the server running?");
     }
   }
 
   async function handleCancel() {
-    await getCurrentWindow().close();
+    await closeThisWindow();
   }
 
-  /* Enter saves (except inside the description box), Esc cancels */
+  /* Enter saves (not in the description box), Esc cancels */
   function handleKeyDown(e) {
     if (e.key === "Escape") handleCancel();
     else if (e.key === "Enter" && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "BUTTON") {
@@ -76,50 +67,57 @@ export default function AddAlarm() {
 
   return (
     <>
-      <div className="alarm-background" style={{ backgroundImage: `url(${bg})` }} />
+      <div className="window-bg" style={{ backgroundImage: `url(${bg})` }} />
       <div className="alarm-window" onKeyDown={handleKeyDown}>
         <h2>Add Alarm</h2>
-        <p>{`${month}/${day}/${year}`}</p>
-        {error && <p className="alarm-error">{error}</p>}
+        <p className="alarm-window-date">{`${month}/${day}/${year}`}</p>
+        {error && <p className="form-error">{error}</p>}
         <input
           ref={titleRef}
+          className="input"
           type="text"
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
         <textarea
+          className="input"
           placeholder="Description"
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
         />
         <input
+          className="input"
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
         />
 
-        <div className="alarm-repeat-toggle">
+        <PicturePicker path={imagePath} onChange={setImagePath} />
+
+        <div className="segmented" role="tablist" aria-label="Repeat">
           {[["none", "No repeat"], ["weekly", "Weekly"], ["yearly", "Yearly"]].map(([mode, label]) => (
             <button
               key={mode}
               type="button"
-              className={`repeat-mode-btn ${repeatMode === mode ? "repeat-mode-btn--active" : ""}`}
+              role="tab"
+              aria-selected={repeatMode === mode}
+              className={`segmented-btn${repeatMode === mode ? " segmented-active" : ""}`}
               onClick={() => setRepeatMode(mode)}
             >{label}</button>
           ))}
         </div>
 
         {repeatMode !== "none" && (
-          <div className="alarm-duplicate-panel">
-            <p className="alarm-duplicate-label">Repeat until</p>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <div className="alarm-repeat-panel">
+            <p className="alarm-repeat-label">Repeat until</p>
+            <input className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         )}
 
         <div className="alarm-buttons">
-          <button onClick={saveAlarm}>Save</button>
-          <button onClick={handleCancel}>Cancel</button>
+          <button className="btn btn-primary" onClick={saveAlarm}>Save</button>
+          <button className="btn" onClick={handleCancel}>Cancel</button>
         </div>
       </div>
     </>

@@ -37,7 +37,10 @@
   Create, edit, and delete events with more emotion than the situation requires.
 
 - **Teen spirit AI chatbot**  
-  A 19‑year‑old from the Midwest who comments on your calendar like it’s a diary you left open.
+  A 19‑year‑old from the Midwest who comments on your calendar like it’s a diary you left open. Every so often she suggests an event, and one click puts it on your calendar. She runs on [Ollama](https://ollama.com) on your own computer, so your schedule never leaves it.
+
+- **Pick your own AI model**  
+  Llama 3.2 is the default, but the chat works with any model Ollama can run. Switch models from the chat window, or type a model name like `mistral` or `gemma2:9b` to download another one. Bigger models are smarter and slower, so choose what your computer can handle.
 
 - **Customizable backgrounds, fonts, alert sounds, and more!**  
   Your calendar should look and sound like the mood you are in.

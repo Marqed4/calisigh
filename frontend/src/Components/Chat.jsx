@@ -1,62 +1,129 @@
 import { useState, useEffect, useRef } from "react";
-import Send from "../resources/assets/images/Signs/Semi Reflective Guitar.gif";
-import { getBackground } from "./backgrounds.js";
+import { GUITARS, guitarStyle, nextGuitar } from "../lib/guitars.js";
+import { getBackground } from "../lib/backgrounds.js";
+import { isRangeSet, rangeLabel, rangeQuery, readRange } from "../lib/alarmRange.js";
+import { alarms as alarmsApi, chat } from "../lib/api.js";
+import { notifyAlarmsChanged } from "../lib/windows.js";
+import ModelPicker from "./ModelPicker.jsx";
 import "./Chat.css";
 
 const FALLBACK_GREETING = "Hey... like, what do you want?";
 
-function buildAlarmContext(alarms) {
+async function fetchAlarms(range) {
+  try {
+    return await alarmsApi.list(rangeQuery(range));
+  } catch (_) {
+    return [];
+  }
+}
+
+function buildAlarmContext(alarms, range) {
+  const scope = isRangeSet(range) ? ` (limited to ${rangeLabel(range)})` : "";
   return alarms.length > 0
-    ? `The user's calendar events are: ${alarms.map(a =>
+    ? `The user's calendar events${scope} are: ${alarms.map(a =>
         `"${a.title}" at ${new Date(a.time).toLocaleString()}${a.desc ? ` (${a.desc})` : ""}`
       ).join("; ")}.`
-    : "The user has no calendar events.";
+    : `The user has no calendar events${scope}.`;
+}
+
+function sessionDate(iso) {
+  return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+async function saveMessage(sessionId, role, content) {
+  try {
+    await chat.sessions.addMessage(sessionId, role, content);
+  } catch (_) {}
 }
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [alarms, setAlarms] = useState([]);
+  /* null until the first user message, so empty chats are never saved */
+  const [sessionId, setSessionId] = useState(null);
+  /* last session, offered for resuming */
+  const [resumeOffer, setResumeOffer] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [guitar, setGuitar] = useState(() => Math.floor(Math.random() * GUITARS.length));
+  const [sessions, setSessions] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  /* Same resolver as every other window, so custom backgrounds work here too */
   const bg = getBackground();
 
-  /* Fetch alarms and ask the backend for a fresh greeting. Also used by "New chat". */
-  async function startConversation() {
-    setMessages([]);
-    let loadedAlarms = [];
+  async function loadSessions() {
     try {
-      const res = await fetch("http://localhost:4567/api/alarms");
-      loadedAlarms = await res.json();
-      setAlarms(loadedAlarms);
-    } catch (_) {}
-
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:4567/api/chat/greeting", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alarmContext: buildAlarmContext(loadedAlarms) }),
-      });
-      const data = await res.json();
-      setMessages([{ role: "assistant", content: data.reply ?? FALLBACK_GREETING }]);
+      const data = await chat.sessions.list();
+      setSessions(data);
+      return data;
     } catch (_) {
-      setMessages([{ role: "assistant", content: FALLBACK_GREETING }]);
+      return [];
+    }
+  }
+
+  async function startNewConversation() {
+    setMessages([]);
+    setSessionId(null);
+    setResumeOffer(null);
+    setShowHistory(false);
+    setLoading(true);
+    const range = readRange();
+    let reply = FALLBACK_GREETING;
+    try {
+      const alarms = await fetchAlarms(range);
+      const data = await chat.greeting(buildAlarmContext(alarms, range));
+      reply = data.reply ?? FALLBACK_GREETING;
+    } catch (_) {}
+    setMessages([{ role: "assistant", content: reply }]);
+    setLoading(false);
+  }
+
+  async function openChat() {
+    const past = await loadSessions();
+    if (past.length > 0) {
+      setMessages([]);
+      setResumeOffer(past[0]);
+    } else {
+      startNewConversation();
+    }
+  }
+
+  async function resumeSession(id) {
+    setLoading(true);
+    setShowHistory(false);
+    setResumeOffer(null);
+    try {
+      const data = await chat.sessions.get(id);
+      setMessages(data.messages ?? []);
+      setSessionId(id);
+    } catch (_) {
+      startNewConversation();
+      return;
     }
     setLoading(false);
   }
 
-  useEffect(() => { startConversation(); }, []);
+  async function removeSession(id) {
+    try {
+      await chat.sessions.remove(id);
+    } catch (_) {}
+    const left = await loadSessions();
+    if (id === sessionId) startNewConversation();
+    else if (resumeOffer?.id === id) setResumeOffer(left[0] ?? null);
+  }
 
-  /* Keep the newest message in view */
+  async function toggleHistory() {
+    if (!showHistory) await loadSessions();
+    setShowHistory(s => !s);
+  }
+
+  useEffect(() => { openChat(); }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, resumeOffer]);
 
-  /* Put the cursor back in the box whenever a reply finishes */
   useEffect(() => {
     if (!loading) inputRef.current?.focus();
   }, [loading]);
@@ -67,21 +134,49 @@ export default function Chat() {
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
+    setResumeOffer(null);
     setLoading(true);
+
+    /* First message creates the session and saves what is on screen */
+    let id = sessionId;
     try {
-      const response = await fetch("http://localhost:4567/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alarmContext: buildAlarmContext(alarms), messages: newMessages }),
-      });
-      const data = await response.json();
+      if (id === null) {
+        id = (await chat.sessions.create()).id;
+        setSessionId(id);
+        for (const m of messages) await saveMessage(id, m.role, m.content);
+      }
+      await saveMessage(id, userMsg.role, userMsg.content);
+    } catch (_) {}
+
+    try {
+      /* Read fresh so main-window changes apply right away */
+      const range = readRange();
+      const alarms = await fetchAlarms(range);
+      const data = await chat.reply({ sessionId: id, alarmContext: buildAlarmContext(alarms, range), messages: newMessages });
       const reply = data.reply ?? "...whatever, I got nothing. Try again I guess.";
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+      setMessages(prev => [...prev, { role: "assistant", content: reply, suggestion: data.suggestion }]);
+      if (id !== null) saveMessage(id, "assistant", reply);
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", content: "Great, something broke. not surprised honestly. Try again." }]);
     }
     setLoading(false);
   };
+
+  /* The assistant's occasional event idea becomes a real alarm */
+  async function addSuggestion(index) {
+    const { suggestion } = messages[index];
+    try {
+      await alarmsApi.create({ time: suggestion.time, title: suggestion.title, desc: "Suggested in chat" });
+      await notifyAlarmsChanged();
+      setMessages(prev => prev.map((m, i) => (i === index ? { ...m, added: true } : m)));
+    } catch (_) {}
+  }
+
+  /* Every click on the button swaps the guitar */
+  function handleSendClick() {
+    setGuitar(g => nextGuitar(g));
+    sendMessage();
+  }
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -90,49 +185,108 @@ export default function Chat() {
     }
   };
 
+  const range = readRange();
+
   return (
     <div style={{ position: "relative", height: "100vh" }}>
-      <div className="chat-background" style={{ backgroundImage: bg ? `url(${bg})` : undefined }} />
+      <div className="window-bg" style={{ backgroundImage: bg ? `url(${bg})` : undefined }} />
       <div className="chat-wrapper">
         <div className="chat-header">
           <span>Calisigh Helper</span>
-          <button
-            className="chat-close"
-            onClick={startConversation}
-            disabled={loading}
-            title="Clear this conversation and start over"
-          >
-            New chat
-          </button>
+          <span className="chat-header-actions">
+            <button
+              className="chat-close"
+              onClick={toggleHistory}
+              disabled={loading}
+              title="See past conversations"
+            >
+              {showHistory ? "Back" : "History"}
+            </button>
+            <button
+              className="chat-close"
+              onClick={startNewConversation}
+              disabled={loading}
+              title="Start a new conversation (this one stays in History)"
+            >
+              New chat
+            </button>
+          </span>
         </div>
-        <div className="chat-messages">
-          {messages.map((msg, i) => (
-            <div key={i} className={`chat-bubble ${msg.role}`}>
-              {msg.content}
-            </div>
-          ))}
-          {loading && (
-            <div className="chat-bubble assistant loading">
-              <span className="dot" /><span className="dot" /><span className="dot" />
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+        {isRangeSet(range) && (
+          <div className="chat-range" title="Change this in the main window sidebar">
+            Looking at: {rangeLabel(range)}
+          </div>
+        )}
+
+        <ModelPicker />
+
+        {showHistory ? (
+          <div className="chat-messages">
+            {sessions.length === 0 && <div className="chat-bubble assistant">Nothing here yet. Typical.</div>}
+            {sessions.map(s => (
+              <div key={s.id} className="chat-session">
+                <button className="chat-session-open" onClick={() => resumeSession(s.id)}>
+                  <span className="chat-session-title">{s.title || "Untitled"}</span>
+                  <span className="chat-session-meta">{sessionDate(s.startedAt)} · {s.messageCount} messages</span>
+                </button>
+                <button
+                  className="chat-session-delete"
+                  onClick={() => removeSession(s.id)}
+                  aria-label={`Delete conversation ${s.title}`}
+                  title="Delete"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="chat-messages">
+            {resumeOffer && (
+              <>
+                <div className="chat-bubble assistant">
+                  Hey... so last time we were on "{resumeOffer.title || "something"}" ({sessionDate(resumeOffer.startedAt)}).
+                  Wanna pick up where we left off, or start over?
+                </div>
+                <div className="chat-offer">
+                  <button className="btn" onClick={() => resumeSession(resumeOffer.id)}>Pick up where we left off</button>
+                  <button className="btn" onClick={startNewConversation}>Start fresh</button>
+                </div>
+              </>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className="chat-turn">
+                <div className={`chat-bubble ${msg.role}`}>
+                  {msg.content}
+                </div>
+                {msg.suggestion && (
+                  <button className="btn chat-suggestion" disabled={msg.added} onClick={() => addSuggestion(i)}>
+                    {msg.added ? "Added to your calendar" : `Add "${msg.suggestion.title}" (${new Date(msg.suggestion.time).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })})`}
+                  </button>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="chat-bubble assistant loading">
+                <span className="dot" /><span className="dot" /><span className="dot" />
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+
         <div className="chat-input-row">
           <textarea
             ref={inputRef}
-            className="chat-input"
+            className="input chat-input"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Pour your heart out... or whatever."
             rows={2}
           />
-          <button className="chat-send" onClick={sendMessage} disabled={loading}>
-            <img src={Send}
-            alt="Send"
-            className="chat-send"
-            />
+          <button className="icon-btn btn-primary chat-send" onClick={handleSendClick} disabled={loading} aria-label="Send">
+            <span key={guitar} className="guitar-icon" style={guitarStyle(GUITARS[guitar])}>🎸</span>
           </button>
         </div>
       </div>

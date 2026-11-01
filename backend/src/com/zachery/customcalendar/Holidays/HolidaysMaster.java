@@ -1,9 +1,7 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Holidays;
 
 import java.util.List;
 
-import com.zachery.customcalendar.Holidays.CalendarificHolidays;
-import com.zachery.customcalendar.Holidays.Holiday;
 
 public class HolidaysMaster
 {

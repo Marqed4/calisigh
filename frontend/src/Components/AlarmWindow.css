@@ -1,0 +1,78 @@
+/* Add and edit alarm windows */
+.alarm-window {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100vh;
+  padding: 20px 18px 16px;
+  overflow-y: auto;
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+.alarm-window h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.alarm-window-date {
+  margin-top: -6px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.alarm-window textarea.input {
+  resize: none;
+  height: 72px;
+}
+
+.alarm-window .segmented {
+  width: 100%;
+}
+
+.alarm-window .segmented-btn {
+  flex: 1;
+}
+
+.alarm-repeat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.alarm-repeat-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.alarm-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.alarm-buttons .btn {
+  flex: 1;
+}
+
+.alarm-picture {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alarm-picture-preview {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

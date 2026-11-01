@@ -130,13 +130,7 @@ fn main() {
                 _ => {}
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::call_java,
-            commands::open_add_alarm,
-            commands::open_view_edit_alarm,
-            commands::open_settings,
-            commands::open_chat_assistant
-        ])
+        .invoke_handler(tauri::generate_handler![commands::list_system_fonts])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

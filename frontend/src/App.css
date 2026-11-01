@@ -1,3 +1,43 @@
+/*
+  Design tokens for the main window. Sub-windows (add/edit alarm, settings,
+  chat) still use their own styles and have not been moved onto these yet.
+*/
+:root {
+  --font-ui: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --text: #f2f2f5;
+  --text-dim: rgba(242, 242, 245, 0.68);
+  --text-faint: rgba(242, 242, 245, 0.42);
+
+  --panel: rgba(16, 16, 22, 0.62);
+  --panel-solid: #16161c;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.12);
+
+  --accent: #8ab4ff;
+  --accent-soft: rgba(138, 180, 255, 0.2);
+  --holiday: #ffd479;
+  --danger: #ff8a8a;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --blur: blur(10px);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+}
+
 .background-wrapper {
   position: fixed;
   inset: 0;
@@ -21,7 +61,183 @@
   display: flex;
   height: 100vh;
   background: transparent;
-  color: white;
-  font-family: sans-serif;
+  color: var(--text);
+  font-family: var(--font-ui);
   overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Shared by every window */
+.btn,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn {
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+}
+
+.btn:hover:not(:disabled),
+.icon-btn:hover {
+  background: var(--surface-hover);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Month / Week / Year switch */
+.segmented {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.segmented-btn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segmented-btn:hover {
+  color: var(--text);
+}
+
+.segmented-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+
+.btn-primary {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: rgba(138, 180, 255, 0.34);
+  border-color: transparent;
+}
+
+.btn-danger {
+  background: rgba(255, 138, 138, 0.14);
+  border-color: transparent;
+  color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 138, 138, 0.28);
+  border-color: transparent;
+}
+
+/* Background image behind the small windows */
+.window-bg {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.window-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.input:focus {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.form-error {
+  font-size: 0.78rem;
+  color: var(--danger);
+  background: rgba(255, 138, 138, 0.1);
+  border: 1px solid rgba(255, 138, 138, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+}
+
+/* Settings: blur off and sharp cells */
+.app-container[data-blur="off"] {
+  --blur: none;
+  --panel: rgba(16, 16, 22, 0.82);
+}
+
+.app-container[data-cells="sharp"] {
+  --radius-sm: 0;
+  --radius: 0;
+  --radius-lg: 0;
+  --border: rgba(255, 255, 255, 0.35);
+}
+
+/* A picture attached to an alarm shows behind its day */
+.has-picture,
+.has-picture:hover {
+  background: linear-gradient(rgba(10, 10, 16, 0.5), rgba(10, 10, 16, 0.65)), var(--picture) center / cover;
 }

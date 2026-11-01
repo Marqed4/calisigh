@@ -86,15 +86,15 @@ fn check_ollama(app_handle: &tauri::AppHandle, is_autostart: bool) {
         } else {
             app_handle
                 .dialog()
-                .message("Whatever, like, Calisigh needs Ollama for the chat thing and it's just not here; typical: \n\n get it from https://ollama.com/download, then run: \n\n  ollama pull llama3.2\n\nnobody ever explains anything to me either.")
+                .message("Whatever, like, Calisigh needs Ollama for the chat thing and it's just not here; typical: \n\n get it from https://ollama.com/download and open Calisigh again, I'll grab the chat model myself.\n\nnobody ever explains anything to me either.")
                 .title("Ollama's missing, come on dude.")
                 .blocking_show();
         }
     } else if !ollama::is_model_available() {
-        log_line("ollama found but llama3.2 model missing, pulling in background");
+        log_line("ollama found but no model installed, pulling llama3.2 in background");
         ollama::pull_model_in_background();
     } else {
-        log_line("ollama + llama3.2 OK");
+        log_line("ollama + at least one model OK");
     }
 }
 

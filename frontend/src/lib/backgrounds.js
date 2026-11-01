@@ -11,7 +11,27 @@ export const BG_MAP = {
   tree: DefaultBackgrounds.Tree,
   fall: DefaultBackgrounds.Fall,
   winter: DefaultBackgrounds.Winter,
+  sandstone: DefaultBackgrounds.Sandstone,
+  palestone: DefaultBackgrounds.PaleStone,
+  plasterwall: DefaultBackgrounds.PlasterWall,
 };
+
+/* These three used to be custom uploads saved under prefixed names */
+const RENAMED = {
+  day_Sandstone: "sandstone",
+  day_PaleStone: "palestone",
+  night_PlasterWall: "plasterwall",
+};
+
+export function saveBackground(key, customEntries) {
+  localStorage.setItem("calisigh-bg", key);
+  localStorage.setItem("calisigh-custom-bgs", JSON.stringify(customEntries));
+}
+
+export function savedBgKey() {
+  const stored = localStorage.getItem("calisigh-bg") ?? "fall";
+  return RENAMED[stored] ?? stored;
+}
 
 /*
   Shared by every window. Resolves the saved background, including custom
@@ -19,7 +39,7 @@ export const BG_MAP = {
   and falls back to "fall".
 */
 export function getBackground() {
-  const saved = localStorage.getItem("calisigh-bg") ?? "fall";
+  const saved = savedBgKey();
   if (BG_MAP[saved]) return BG_MAP[saved];
   try {
     const customs = JSON.parse(localStorage.getItem("calisigh-custom-bgs") ?? "[]");

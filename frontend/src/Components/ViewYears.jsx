@@ -1,99 +1,38 @@
-import { useState } from "react";
-import { useFontTheme } from "./FontPackage.jsx";
+import { WEEKDAYS_SHORT, dateKey, getMonthCells, isSameDay } from "../lib/calendarUtils.js";
 import "./ViewYears.css";
 
-import leftarrow  from "../resources/assets/images/Signs/Reflective Left Arrow.gif";
-import rightarrow from "../resources/assets/images/Signs/Reflective Right Arrow.gif";
-
-/* Renders each digit of a year as a font-themed GIF */
-function YearDigits({ year }) {
-
-  /* Sub-component has its own hook call to access font context */
-  const { fontTheme } = useFontTheme();
-  const GraffitiNumbers = fontTheme.Numbers;
-
-  const YEAR_DIGITS = [
-    GraffitiNumbers.Date0, GraffitiNumbers.Date1, GraffitiNumbers.Date2,
-    GraffitiNumbers.Date3, GraffitiNumbers.Date4, GraffitiNumbers.Date5,
-    GraffitiNumbers.Date6, GraffitiNumbers.Date7, GraffitiNumbers.Date8,
-    GraffitiNumbers.Date9,
-  ];
-
-  const Years = []
+function MiniMonth({ year, month, alarmDays, onSelect }) {
+  const today = new Date();
+  const cells = getMonthCells(new Date(year, month, 1));
+  const name = new Date(year, month, 1).toLocaleString("default", { month: "long" });
 
   return (
-    <div className="view-years-cell-gifs">
-      {String(year).split("").map((digit, i) => (
-        <img
-          key={i}
-          src={YEAR_DIGITS[parseInt(digit)]}
-          alt={digit}
-          className="view-years-number-gif"
-        />
-      ))}
-    </div>
+    <button className="year-month" onClick={() => onSelect(month)} aria-label={`${name} ${year}`}>
+      <span className="year-month-name">{name}</span>
+      <div className="year-month-grid">
+        {WEEKDAYS_SHORT.map(d => <span key={d} className="year-month-dow">{d[0]}</span>)}
+        {cells.map(date => {
+          const outside = date.getMonth() !== month;
+          if (outside) return <span key={date.getTime()} />;
+          const cls = ["year-day"];
+          if (isSameDay(date, today)) cls.push("year-day-today");
+          if (alarmDays.has(dateKey(date))) cls.push("year-day-alarm");
+          return <span key={date.getTime()} className={cls.join(" ")}>{date.getDate()}</span>;
+        })}
+      </div>
+    </button>
   );
 }
 
-export default function ViewYears({ currentDate, onToggleYearView, onSelectYear }) {
-  const [yearOffset, setYearOffset] = useState(0);
-  const { fontTheme } = useFontTheme();
-
-  const YEARS_PER_PAGE = 35;
-  const START_YEAR     = new Date().getFullYear();
-
-  /* Compute the visible year range based on current page offset */
-  const start = START_YEAR + yearOffset * YEARS_PER_PAGE;
-  const end   = start + YEARS_PER_PAGE - 1;
-
-  const years = [];
-  for (let y = start; y <= end; y++) {
-    years.push(y);
-  }
-
-  const onPrev = () => setYearOffset(yearOffset - 1);
-  const onNext = () => setYearOffset(yearOffset + 1);
-
-  const isCurrentYear = (y) => y === new Date().getFullYear();
+export default function ViewYears({ currentDate, alarms = [], onSelectMonth }) {
+  const year = currentDate.getFullYear();
+  const alarmDays = new Set(alarms.map(a => a.time?.slice(0, 10)));
 
   return (
-    <div className="year-view-container">
-      <div className="view-years-top-nav">
-        <img src={leftarrow}
-        title="Past Years"
-        alt="Previous"
-        className="view-years-nav-arrow"
-        onClick={onPrev} />
-
-        {/* Clicking the Years header returns to month view */}
-        <div className="main-month" 
-        onClick={onToggleYearView} 
-        style={{ cursor: "pointer" }}>
-
-          <img src={fontTheme.Years}
-          title="Toggle Months"
-          alt="Years"
-          className="years-header-gif" />
-        </div>
-
-        <img src={rightarrow}
-        title="Future Years"
-        alt="Next"
-        className="view-years-nav-arrow"
-        onClick={onNext} />
-      </div>
-
-      <div className="years-grid">
-        {years.map((y) => (
-          <div
-            key={y}
-            className={`year-cell${isCurrentYear(y) ? " year-current" : ""}`}
-            onClick={() => onSelectYear(y)}
-          >
-            <YearDigits year={y} />
-          </div>
-        ))}
-      </div>
+    <div className="year-view">
+      {Array.from({ length: 12 }, (_, m) => (
+        <MiniMonth key={m} year={year} month={m} alarmDays={alarmDays} onSelect={mo => onSelectMonth(year, mo)} />
+      ))}
     </div>
   );
 }

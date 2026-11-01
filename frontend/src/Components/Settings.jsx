@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
-import { FONT_THEMES, useFontTheme } from "./FontPackage.jsx";
-import RemoveIcon from "../resources/assets/images/Signs/Red Remove.gif"
-import VolumeIcon from "../resources/assets/images/Signs/Volume.gif";
+import { Close, Upload, Volume } from "./Icons.jsx";
+import { backgrounds, sounds } from "../lib/api.js";
+import { saveBackground, savedBgKey } from "../lib/backgrounds.js";
+import { appearance, holidayToggles } from "../lib/settings.js";
+import { closeThisWindow } from "../lib/windows.js";
+import { applyFont, listFonts, saveFont, savedFont } from "../lib/fonts.js";
 import "./Settings.css";
 
 const BG_MAP = [
@@ -17,51 +19,22 @@ const BG_MAP = [
   { label: "Tree",   value: "tree",     src: DefaultBackgrounds.Tree },
   { label: "Fall",   value: "fall",     src: DefaultBackgrounds.Fall },
   { label: "Winter", value: "winter",   src: DefaultBackgrounds.Winter },
+  { label: "Sandstone",   value: "sandstone",   src: DefaultBackgrounds.Sandstone },
+  { label: "PaleStone",   value: "palestone",   src: DefaultBackgrounds.PaleStone },
+  { label: "PlasterWall", value: "plasterwall", src: DefaultBackgrounds.PlasterWall },
 ];
-
-function HoverGif({ inactive, active, onClick, title, className }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <img
-      src={hovered ? active : inactive}
-      alt={title}
-      className={className}
-      title={title}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    />
-  );
-}
 
 export default function Settings() {
 
-  const { fontKey, setFontTheme, fontTheme } = useFontTheme();
-
-  const SETTINGS = {
-    CancelActive:   fontTheme.Settings.CancelActive,
-    CancelInactive: fontTheme.Settings.CancelInactive,
-    RemoveActive:   fontTheme.Settings.RemoveActive,
-    RemoveInactive: fontTheme.Settings.RemoveInactive,
-    SaveActive:     fontTheme.Settings.SaveActive,
-    SaveInactive:   fontTheme.Settings.SaveInactive,
-    UpdateActive:   fontTheme.Settings.UpdateActive,
-    UpdateInactive: fontTheme.Settings.UpdateInactive,
-    UploadActive:   fontTheme.Settings.UploadActive,
-    UploadInactive: fontTheme.Settings.UploadInactive,
-  };
-
-  const [selectedBg, setSelectedBg] = useState(
-    localStorage.getItem("calisigh-bg") ?? "fall"
-  );
-  const [showFederal,    setShowFederal]    = useState(() => localStorage.getItem("calisigh-holidays-federal")    !== "false");
-  const [showObservance, setShowObservance] = useState(() => localStorage.getItem("calisigh-holidays-observance") !== "false");
-  const [showReligious,  setShowReligious]  = useState(() => localStorage.getItem("calisigh-holidays-religious")  !== "false");
+  const [selectedBg, setSelectedBg] = useState(savedBgKey);
+  const [toggles, setToggles] = useState(holidayToggles.read);
+  const flip = (name) => setToggles(t => ({ ...t, [name]: !t[name] }));
+  const [font, setFont] = useState(savedFont);
+  const [fonts, setFonts] = useState([]);
+  const [look, setLook] = useState(appearance.read);
   const [customBackgrounds, setCustomBackgrounds] = useState([]);
   const [customSounds, setCustomSounds] = useState([]);
-  const [selectedSound, setSelectedSound] = useState(
-    localStorage.getItem("calisigh-sound") ?? null
-  );
+  const [selectedSound, setSelectedSound] = useState(null);
   const [volume, setVolume] = useState(100);
   const volumeDebounceRef = useRef(null);
   const selectedSoundRef = useRef(selectedSound);
@@ -79,6 +52,7 @@ export default function Settings() {
         : BG_MAP[0].src;
 
   useEffect(() => {
+    listFonts().then(setFonts);
     loadBackgrounds();
     loadSounds();
     loadVolume();
@@ -86,9 +60,7 @@ export default function Settings() {
 
   async function loadBackgrounds() {
     try {
-      const res = await fetch("http://localhost:4567/api/backgrounds");
-      const data = await res.json();
-      setCustomBackgrounds(data);
+      setCustomBackgrounds(await backgrounds.list());
     } catch (err) {
       console.error("Failed to load backgrounds:", err);
     }
@@ -96,20 +68,9 @@ export default function Settings() {
 
   async function loadSounds() {
     try {
-      const [soundsRes, selectedRes] = await Promise.all([
-        fetch("http://localhost:4567/api/sounds"),
-        fetch("http://localhost:4567/api/sounds/selected"),
-      ]);
-      const sounds = await soundsRes.json();
-      const selected = await selectedRes.json();
-      setCustomSounds(sounds);
-      if (selected && selected !== "") {
-        setSelectedSound(selected);
-        localStorage.setItem("calisigh-sound", selected);
-      } else {
-        setSelectedSound(null);
-        localStorage.removeItem("calisigh-sound");
-      }
+      const [list, selected] = await Promise.all([sounds.list(), sounds.selected()]);
+      setCustomSounds(list);
+      setSelectedSound(selected || null);
     } catch (err) {
       console.error("Failed to load sounds:", err);
     }
@@ -117,8 +78,7 @@ export default function Settings() {
 
   async function loadVolume() {
     try {
-      const res = await fetch("http://localhost:4567/api/sounds/volume");
-      const data = await res.json();
+      const data = await sounds.volume();
       setVolume(Math.round((data.volume ?? 1.0) * 100));
     } catch (err) {
       console.error("Failed to load volume:", err);
@@ -131,11 +91,7 @@ export default function Settings() {
     clearTimeout(volumeDebounceRef.current);
     volumeDebounceRef.current = setTimeout(async () => {
       try {
-        await fetch("http://localhost:4567/api/sounds/volume", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ volume: val / 100 }),
-        });
+        await sounds.setVolume(val / 100);
       } catch (err) {
         console.error("Failed to set volume:", err);
       }
@@ -149,11 +105,7 @@ export default function Settings() {
         filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
       });
       if (!path) return;
-      await fetch("http://localhost:4567/api/backgrounds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath: path }),
-      });
+      await backgrounds.add(path);
       await new Promise(r => setTimeout(r, 300));
       await loadBackgrounds();
     } catch (err) {
@@ -165,11 +117,7 @@ export default function Settings() {
     const name = entry.split("|&")[0];
     if (selectedBg === name) setSelectedBg("fall");
     try {
-      await fetch("http://localhost:4567/api/backgrounds", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+      await backgrounds.remove(name);
       await loadBackgrounds();
     } catch (err) {
       console.error("Failed to remove background:", err);
@@ -183,11 +131,7 @@ export default function Settings() {
         filters: [{ name: "Audio", extensions: ["mp3", "wav"] }],
       });
       if (!path) return;
-      await fetch("http://localhost:4567/api/sounds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath: path }),
-      });
+      await sounds.add(path);
       await new Promise(r => setTimeout(r, 300));
       await loadSounds();
     } catch (err) {
@@ -199,11 +143,7 @@ export default function Settings() {
     const name = entry.split("|&")[0];
     if (selectedSound === name) setSelectedSound(null);
     try {
-      await fetch("http://localhost:4567/api/sounds", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+      await sounds.remove(name);
       await loadSounds();
     } catch (err) {
       console.error("Failed to remove sound:", err);
@@ -212,7 +152,7 @@ export default function Settings() {
 
   async function stopSound() {
     try {
-      await fetch("http://localhost:4567/api/sounds/stop", { method: "POST" });
+      await sounds.stop();
     } catch (err) {
       console.error("Failed to stop sound:", err);
     }
@@ -220,39 +160,28 @@ export default function Settings() {
 
   async function previewSound(name) {
     try {
-      await fetch("http://localhost:4567/api/sounds/play", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+      await sounds.play(name);
     } catch (err) {
       console.error("Failed to preview sound:", err);
     }
   }
 
   async function save() {
-    localStorage.setItem("calisigh-font", fontKey);
-    localStorage.setItem("calisigh-bg", selectedBg);
-    localStorage.setItem("calisigh-custom-bgs", JSON.stringify(customBackgrounds));
-    localStorage.setItem("calisigh-holidays-federal",    String(showFederal));
-    localStorage.setItem("calisigh-holidays-observance", String(showObservance));
-    localStorage.setItem("calisigh-holidays-religious",  String(showReligious));
-    if (selectedSound) localStorage.setItem("calisigh-sound", selectedSound);
-    else localStorage.removeItem("calisigh-sound");
+    saveBackground(selectedBg, customBackgrounds);
+    holidayToggles.write(toggles);
+    appearance.write(look);
+    saveFont(font);
     try {
-      await fetch("http://localhost:4567/api/sounds/select", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: selectedSound ?? "" }),
-      });
+      await sounds.select(selectedSound ?? "");
       await stopSound();
     } catch (_) {}
-    await getCurrentWindow().close();
+    await closeThisWindow();
   }
 
   async function handleCancel() {
+    applyFont();
     await stopSound();
-    await getCurrentWindow().close();
+    await closeThisWindow();
   }
 
   return (
@@ -271,50 +200,75 @@ export default function Settings() {
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">Federal Holidays</span>
               <button
-                className={`settings-toggle-btn ${showFederal ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setShowFederal(v => !v)}
+                className={`settings-toggle-btn ${toggles.federal ? "settings-toggle-btn--on" : ""}`}
+                onClick={() => flip('federal')}
                 title="Show or hide US federal holidays"
               >
-                {showFederal ? "On" : "Off"}
+                {toggles.federal ? "On" : "Off"}
               </button>
             </div>
 
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">Observances</span>
               <button
-                className={`settings-toggle-btn ${showObservance ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setShowObservance(v => !v)}
+                className={`settings-toggle-btn ${toggles.observance ? "settings-toggle-btn--on" : ""}`}
+                onClick={() => flip('observance')}
                 title="Show or hide cultural observances like Earth Day, Halloween, etc."
               >
-                {showObservance ? "On" : "Off"}
+                {toggles.observance ? "On" : "Off"}
               </button>
             </div>
 
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">Religious Observances</span>
               <button
-                className={`settings-toggle-btn ${showReligious ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setShowReligious(v => !v)}
+                className={`settings-toggle-btn ${toggles.religious ? "settings-toggle-btn--on" : ""}`}
+                onClick={() => flip('religious')}
                 title="Show or hide religious observances like Easter, Good Friday, Hanukkah, etc."
               >
-                {showReligious ? "On" : "Off"}
+                {toggles.religious ? "On" : "Off"}
               </button>
             </div>
 
-            {Object.keys(FONT_THEMES).length > 1 && (
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Font Style</span>
-              <select
-                className="settings-font-select"
-                value={fontKey}
-                onChange={e => setFontTheme(e.target.value)}
-              >
-                {Object.entries(FONT_THEMES).map(([key, theme]) => (
-                  <option key={key} value={key}>{theme.label}</option>
-                ))}
-              </select>
+            <div className="settings-font-row">
+              <span className="settings-toggle-label">Font</span>
+              <input
+                className="input"
+                list="settings-font-list"
+                placeholder="Default"
+                value={font}
+                onChange={e => {
+                  setFont(e.target.value);
+                  if (e.target.value === "" || fonts.includes(e.target.value)) applyFont(e.target.value);
+                }}
+              />
+              <datalist id="settings-font-list">
+                {fonts.map(f => <option key={f} value={f} />)}
+              </datalist>
+              {font && <button className="settings-font-reset" onClick={() => { setFont(""); applyFont(""); }}>Default</button>}
             </div>
-            )}
+
+            <div className="settings-toggle-row">
+              <span className="settings-toggle-label">Blur behind cells</span>
+              <button
+                className={`settings-toggle-btn ${look.cellBlur ? "settings-toggle-btn--on" : ""}`}
+                onClick={() => setLook(l => ({ ...l, cellBlur: !l.cellBlur }))}
+                title="Frosted glass effect behind the calendar cells and panels"
+              >
+                {look.cellBlur ? "On" : "Off"}
+              </button>
+            </div>
+
+            <div className="settings-toggle-row">
+              <span className="settings-toggle-label">Sharp cells</span>
+              <button
+                className={`settings-toggle-btn ${look.sharpCells ? "settings-toggle-btn--on" : ""}`}
+                onClick={() => setLook(l => ({ ...l, sharpCells: !l.sharpCells }))}
+                title="Square corners and crisp borders instead of rounded ones"
+              >
+                {look.sharpCells ? "On" : "Off"}
+              </button>
+            </div>
 
             <div className="settings-bg-picker">
               {BG_MAP.map(bg => (
@@ -339,12 +293,14 @@ export default function Settings() {
                   >
                     <img src={convertFileSrc(path)} alt={name} className="settings-bg-img" />
                     <span className="settings-bg-label">{name}</span>
-                    <img
-                      src={SETTINGS.RemoveInactive}
-                      alt="Remove"
-                      className="settings-bg-remove"
+                    <button
+                      className="settings-remove settings-bg-remove"
+                      aria-label={`Remove ${name}`}
+                      title="Remove"
                       onClick={(e) => { e.stopPropagation(); removeBackground(entry); }}
-                    />
+                    >
+                      <Close size={12} />
+                    </button>
                   </div>
                 );
               })}
@@ -352,21 +308,11 @@ export default function Settings() {
           </div>
 
           <div className="settings-actions">
-            <div className="settings-action-btn" onClick={uploadBackground}>
-              <HoverGif inactive={SETTINGS.UploadInactive} 
-              active={SETTINGS.UploadActive} title="Upload Background" 
-              className="settings-upload-backgrounds-gif" />
-            </div>
-            <div className="settings-action-btn" onClick={save}>
-              <HoverGif inactive={SETTINGS.SaveInactive} 
-              active={SETTINGS.SaveActive} title="Save" 
-              className="settings-save-gif" />
-            </div>
-            <div className="settings-action-btn" onClick={handleCancel}>
-              <HoverGif inactive={SETTINGS.CancelInactive} 
-              active={SETTINGS.CancelActive} title="Cancel" 
-              className="settings-cancel-gif" />
-            </div>
+            <button className="btn" onClick={uploadBackground}>
+              <Upload size={14} />&nbsp;Background
+            </button>
+            <button className="btn btn-primary" onClick={save}>Save</button>
+            <button className="btn" onClick={handleCancel}>Cancel</button>
           </div>
         </div>
 
@@ -375,8 +321,7 @@ export default function Settings() {
             <h1 className="sound-subtitle">Alert Sound</h1>
 
             <div className="settings-volume-row">
-              {/* TODO: replace VolumeIcon with the correct asset once you confirm the file */}
-              <img className="settings-volume-icon" src={VolumeIcon} alt="Volume" />
+              <span className="settings-volume-icon"><Volume size={16} /></span>
               <div className="settings-volume-slider-wrap">
                 <input
                   className="settings-volume-slider"
@@ -386,8 +331,8 @@ export default function Settings() {
                   value={volume}
                   onChange={handleVolumeChange}
                   style={{
-                    background: `linear-gradient(to right, 
-                    rgba(255,255,255,0.85) ${volume}%, 
+                    background: `linear-gradient(to right,
+                    rgba(255,255,255,0.85) ${volume}%,
                     rgba(255,255,255,0.2) ${volume}%)`
                   }}
                 />
@@ -427,12 +372,14 @@ export default function Settings() {
                     }}
                   >
                     <span>{name}</span>
-                    <img
-                      src={ RemoveIcon }
-                      alt="Remove"
-                      className="settings-sound-remove"
+                    <button
+                      className="settings-remove"
+                      aria-label={`Remove ${name}`}
+                      title="Remove"
                       onClick={(e) => { e.stopPropagation(); removeSound(entry); }}
-                    />
+                    >
+                      <Close size={12} />
+                    </button>
                   </div>
                 );
               })}
@@ -440,15 +387,13 @@ export default function Settings() {
           </div>
 
           <div className="settings-sounds-footer">
-            <div className="settings-action-btn" onClick={uploadSound}>
-              <HoverGif inactive={SETTINGS.UploadInactive} 
-              active={SETTINGS.UploadActive} onClick={uploadSound} 
-              title="Add Sound" className="settings-upload-songs-gif" />
-            </div>
+            <button className="btn" onClick={uploadSound}>
+              <Upload size={14} />&nbsp;Add sound
+            </button>
           </div>
         </div>
 
       </div>
     </>
   );
-}
+}

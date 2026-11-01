@@ -1,4 +1,7 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Media;
+
+import com.zachery.customcalendar.Storage.Database;
+import com.zachery.customcalendar.Storage.SystemDirectory;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -30,8 +30,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.zachery.customcalendar.Database;
-import com.zachery.customcalendar.SystemDirectory;
+import com.zachery.customcalendar.Storage.Database;
+import com.zachery.customcalendar.Storage.SystemDirectory;
 
 /*
 Every holiday in the app comes from Calendarific now.

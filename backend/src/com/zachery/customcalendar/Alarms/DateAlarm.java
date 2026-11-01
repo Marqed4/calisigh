@@ -1,4 +1,7 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Alarms;
+
+import com.zachery.customcalendar.Media.AlarmSounds;
+import com.zachery.customcalendar.Storage.Database;
 
 import java.sql.SQLException;
 import java.time.Duration;
@@ -44,9 +47,9 @@ public class DateAlarm
         synchronized (lock) { return new ArrayList<>(alarmDataList); }
     }
 
-    public void setAlarm(LocalDateTime time, String title, String desc) throws SQLException
+    public void setAlarm(LocalDateTime time, String title, String desc, String image) throws SQLException
     {
-        AlarmRecord alarm = db.insert(time, title, desc);
+        AlarmRecord alarm = db.insert(time, title, desc, image);
 
         synchronized (lock)
         {
@@ -83,13 +86,22 @@ public class DateAlarm
         return id != null && removeAlarm(id);
     }
 
-    public boolean updateAlarm(String idOrTime, LocalDateTime newTime, String newTitle, String newDesc) throws SQLException
+    // newImage is the stored (relative) path, "" to clear, or null to keep the current picture
+    public boolean updateAlarm(String idOrTime, LocalDateTime newTime, String newTitle, String newDesc, String newImage) throws SQLException
     {
         Long id = resolveId(idOrTime);
-        if (id == null || !db.update(id, newTime, newTitle, newDesc))
+        if (id == null) return false;
+
+        String image = newImage;
+        if (image == null)
+        {
+            String current = getAlarms().stream().filter(a -> a.id() == id).map(AlarmRecord::image).findFirst().orElse("");
+            image = current.isEmpty() ? "" : Database.toStoredPath(new java.io.File(current));
+        }
+        if (!db.update(id, newTime, newTitle, newDesc, image))
             return false;
 
-        AlarmRecord updated = new AlarmRecord(id, newTime, newTitle, newDesc == null ? "" : newDesc);
+        AlarmRecord updated = new AlarmRecord(id, newTime, newTitle, newDesc == null ? "" : newDesc, Database.imageToApi(image));
 
         synchronized (lock)
         {
@@ -175,9 +187,7 @@ public class DateAlarm
                     String selected = alarmSounds.getSelectedSound();
                     AlarmActivation activation = new AlarmActivation(cannon.title(), cannon.desc());
 
-                    Main.alarmFiring.set(true);
-                    Main.firingTitle.set(cannon.title());
-                    Main.firingDesc.set(cannon.desc());
+                    FiringState.start(cannon.title(), cannon.desc());
 
                     //a failed toast shouldn't also silence the sound
                     try { activation.displayTray(); }

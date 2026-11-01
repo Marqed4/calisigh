@@ -1,8 +1,8 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Alarms;
 
 import java.time.LocalDateTime;
 
-public record AlarmRecord(long id, LocalDateTime time, String title, String desc) implements Comparable<AlarmRecord>
+public record AlarmRecord(long id, LocalDateTime time, String title, String desc, String image) implements Comparable<AlarmRecord>
 {
     @Override
     public int compareTo(AlarmRecord other)

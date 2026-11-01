@@ -1,4 +1,6 @@
-package com.zachery.customcalendar;
+package com.zachery.customcalendar.Storage;
+
+import com.zachery.customcalendar.Alarms.AlarmRecord;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +34,8 @@ public class Database
 
     /** One row of the sounds or backgrounds table. path is relative to the Calisigh folder when it lives inside it. */
     public record MediaRow(String name, String path) {}
+    public record ChatSessionRow(long id, String startedAt, String title, int messageCount) {}
+    public record ChatMessageRow(String role, String content) {}
 
     private static Database instance;
 
@@ -61,6 +66,7 @@ public class Database
                 + "title TEXT NOT NULL, "
                 + "description TEXT NOT NULL DEFAULT '')");
             st.execute("CREATE INDEX IF NOT EXISTS idx_alarms_time ON alarms(time)");
+            ensureColumn(st, "alarms", "image", "TEXT NOT NULL DEFAULT ''");
             st.execute("CREATE TABLE IF NOT EXISTS holiday_cache ("
                 + "source TEXT NOT NULL, "
                 + "year INTEGER NOT NULL, "
@@ -78,6 +84,16 @@ public class Database
             st.execute("CREATE TABLE IF NOT EXISTS settings ("
                 + "key TEXT PRIMARY KEY, "
                 + "value TEXT NOT NULL)");
+            st.execute("CREATE TABLE IF NOT EXISTS chat_sessions ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + "started_at TEXT NOT NULL, "
+                + "title TEXT NOT NULL DEFAULT '')");
+            st.execute("CREATE TABLE IF NOT EXISTS chat_messages ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + "session_id INTEGER NOT NULL, "
+                + "role TEXT NOT NULL, "
+                + "content TEXT NOT NULL)");
+            st.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
         }
 
         migrateLegacyEvents();
@@ -86,14 +102,38 @@ public class Database
         migrateLegacySettings();
     }
 
-    public synchronized AlarmRecord insert(LocalDateTime time, String title, String desc) throws SQLException
+    // Databases from before alarm pictures existed get the column added on first launch
+    private static void ensureColumn(Statement st, String table, String column, String ddl) throws SQLException
+    {
+        try (ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")"))
+        {
+            while (rs.next())
+                if (column.equalsIgnoreCase(rs.getString("name"))) return;
+        }
+        st.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + ddl);
+    }
+
+    // The table keeps the picture's path relative to the Calisigh folder; the API hands out the absolute one
+    public static String imageToApi(String stored)
+    {
+        return stored == null || stored.isEmpty() ? "" : fromStoredPath(stored).getAbsolutePath();
+    }
+
+    private static AlarmRecord alarmFrom(ResultSet rs) throws SQLException
+    {
+        return new AlarmRecord(rs.getLong(1), LocalDateTime.parse(rs.getString(2)),
+                               rs.getString(3), rs.getString(4), imageToApi(rs.getString(5)));
+    }
+
+    public synchronized AlarmRecord insert(LocalDateTime time, String title, String desc, String image) throws SQLException
     {
         try (PreparedStatement ps = conn.prepareStatement(
-            "INSERT INTO alarms(time, title, description) VALUES(?,?,?)"))
+            "INSERT INTO alarms(time, title, description, image) VALUES(?,?,?,?)"))
         {
             ps.setString(1, time.toString());
             ps.setString(2, title);
             ps.setString(3, desc == null ? "" : desc);
+            ps.setString(4, image == null ? "" : image);
             ps.executeUpdate();
         }
 
@@ -103,7 +143,7 @@ public class Database
              ResultSet rs = st.executeQuery("SELECT last_insert_rowid()"))
         {
             rs.next();
-            return new AlarmRecord(rs.getLong(1), time, title, desc == null ? "" : desc);
+            return new AlarmRecord(rs.getLong(1), time, title, desc == null ? "" : desc, imageToApi(image));
         }
     }
 
@@ -116,15 +156,16 @@ public class Database
         }
     }
 
-    public synchronized boolean update(long id, LocalDateTime time, String title, String desc) throws SQLException
+    public synchronized boolean update(long id, LocalDateTime time, String title, String desc, String image) throws SQLException
     {
         try (PreparedStatement ps = conn.prepareStatement(
-            "UPDATE alarms SET time = ?, title = ?, description = ? WHERE id = ?"))
+            "UPDATE alarms SET time = ?, title = ?, description = ?, image = ? WHERE id = ?"))
         {
             ps.setString(1, time.toString());
             ps.setString(2, title);
             ps.setString(3, desc == null ? "" : desc);
-            ps.setLong(4, id);
+            ps.setString(4, image == null ? "" : image);
+            ps.setLong(5, id);
             return ps.executeUpdate() > 0;
         }
     }
@@ -436,13 +477,134 @@ public class Database
     {
         List<AlarmRecord> out = new ArrayList<>();
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT id, time, title, description FROM alarms ORDER BY id"))
+             ResultSet rs = st.executeQuery("SELECT id, time, title, description, image FROM alarms ORDER BY id"))
         {
-            while (rs.next())
-                out.add(new AlarmRecord(rs.getLong(1), LocalDateTime.parse(rs.getString(2)),
-                                        rs.getString(3), rs.getString(4)));
+            while (rs.next()) out.add(alarmFrom(rs));
         }
         return out;
+    }
+
+    // Inclusive date range, either end may be null. ISO strings sort like dates, so SQL can compare them.
+    public synchronized List<AlarmRecord> loadRange(LocalDate from, LocalDate to) throws SQLException
+    {
+        StringBuilder sql = new StringBuilder("SELECT id, time, title, description, image FROM alarms WHERE 1=1");
+        if (from != null) sql.append(" AND time >= ?");
+        if (to != null) sql.append(" AND time < ?");
+        sql.append(" ORDER BY time, id");
+
+        List<AlarmRecord> out = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql.toString()))
+        {
+            int i = 1;
+            if (from != null) ps.setString(i++, from.atStartOfDay().toString());
+            if (to != null) ps.setString(i, to.plusDays(1).atStartOfDay().toString());
+            try (ResultSet rs = ps.executeQuery())
+            {
+                while (rs.next()) out.add(alarmFrom(rs));
+            }
+        }
+        return out;
+    }
+
+    public synchronized long createChatSession() throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO chat_sessions(started_at) VALUES(?)"))
+        {
+            ps.setString(1, LocalDateTime.now().withNano(0).toString());
+            ps.executeUpdate();
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT last_insert_rowid()"))
+        {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    // The first user message becomes the session title
+    public synchronized void addChatMessage(long sessionId, String role, String content) throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement(
+            "INSERT INTO chat_messages(session_id, role, content) VALUES(?,?,?)"))
+        {
+            ps.setLong(1, sessionId);
+            ps.setString(2, role);
+            ps.setString(3, content);
+            ps.executeUpdate();
+        }
+        if ("user".equals(role))
+        {
+            String title = content.strip().replaceAll("\\s+", " ");
+            if (title.length() > 60) title = title.substring(0, 57) + "...";
+            try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE chat_sessions SET title = ? WHERE id = ? AND title = ''"))
+            {
+                ps.setString(1, title);
+                ps.setLong(2, sessionId);
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    // Newest first, skipping sessions with no user message
+    public synchronized List<ChatSessionRow> listChatSessions() throws SQLException
+    {
+        List<ChatSessionRow> out = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                 "SELECT s.id, s.started_at, s.title, COUNT(m.id) FROM chat_sessions s "
+                 + "JOIN chat_messages m ON m.session_id = s.id "
+                 + "GROUP BY s.id HAVING SUM(m.role = 'user') > 0 ORDER BY s.id DESC"))
+        {
+            while (rs.next())
+                out.add(new ChatSessionRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4)));
+        }
+        return out;
+    }
+
+    public synchronized ChatSessionRow getChatSession(long id) throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement(
+            "SELECT s.id, s.started_at, s.title, (SELECT COUNT(*) FROM chat_messages WHERE session_id = s.id) "
+            + "FROM chat_sessions s WHERE s.id = ?"))
+        {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery())
+            {
+                return rs.next()
+                    ? new ChatSessionRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getInt(4))
+                    : null;
+            }
+        }
+    }
+
+    public synchronized List<ChatMessageRow> getChatMessages(long sessionId) throws SQLException
+    {
+        List<ChatMessageRow> out = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+            "SELECT role, content FROM chat_messages WHERE session_id = ? ORDER BY id"))
+        {
+            ps.setLong(1, sessionId);
+            try (ResultSet rs = ps.executeQuery())
+            {
+                while (rs.next()) out.add(new ChatMessageRow(rs.getString(1), rs.getString(2)));
+            }
+        }
+        return out;
+    }
+
+    public synchronized boolean deleteChatSession(long id) throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM chat_messages WHERE session_id = ?"))
+        {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM chat_sessions WHERE id = ?"))
+        {
+            ps.setLong(1, id);
+            return ps.executeUpdate() > 0;
+        }
     }
 
     /*
