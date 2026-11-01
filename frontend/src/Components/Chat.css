@@ -20,7 +20,7 @@
   height: 100vh;
   background: rgba(10, 10, 10, 0.25);
   color: #fff;
-  font-family: "Partick Hand";
+  font-family: "Patrick Hand", cursive;
   overflow: hidden;
 }
 
@@ -177,4 +177,4 @@
   background-position: center;
   pointer-events: none;
   z-index: 0;
-}
+}

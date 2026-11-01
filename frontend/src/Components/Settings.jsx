@@ -3,7 +3,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
-import { GraffitiSettings } from "../resources/assets/images/Graffiti_Settings/index.js";
 import { FONT_THEMES, useFontTheme } from "./FontPackage.jsx";
 import RemoveIcon from "../resources/assets/images/Signs/Red Remove.gif"
 import VolumeIcon from "../resources/assets/images/Signs/Volume.gif";
@@ -302,6 +301,7 @@ export default function Settings() {
               </button>
             </div>
 
+            {Object.keys(FONT_THEMES).length > 1 && (
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">Font Style</span>
               <select
@@ -314,6 +314,7 @@ export default function Settings() {
                 ))}
               </select>
             </div>
+            )}
 
             <div className="settings-bg-picker">
               {BG_MAP.map(bg => (
@@ -396,7 +397,7 @@ export default function Settings() {
 
             <div className="settings-sounds-list">
               <div
-                className={`settings-sound-card ${selectedSound === null ? "settings-sound-card--selected" : ""}`}
+                className={`settings-sound-card ${selectedSound === null ? "settings-sound-card-selected" : ""}`}
                 onClick={() => {
                   if (selectedSound === null) {
                     stopSound();
@@ -415,7 +416,7 @@ export default function Settings() {
                   <div
                     key={i}
                     title={name}
-                    className={`settings-sound-card ${selectedSound === name ? "settings-sound-card--selected" : ""}`}
+                    className={`settings-sound-card ${selectedSound === name ? "settings-sound-card-selected" : ""}`}
                     onClick={() => {
                       if (selectedSound === name) {
                         stopSound();
@@ -450,4 +451,4 @@ export default function Settings() {
       </div>
     </>
   );
-}
+}

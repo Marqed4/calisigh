@@ -161,3 +161,6 @@ body {
 .alarm-buttons button:active {
   transform: scale(0.97);
 }
+.alarm-window {
+  overflow-y: auto;
+}

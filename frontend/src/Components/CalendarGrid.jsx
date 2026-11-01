@@ -3,6 +3,17 @@ import { useFontTheme } from "./FontPackage.jsx";
 import Remove from "../resources/assets/images/Signs/Red Remove.gif";
 import "./CalendarGrid.css";
 
+/* Local YYYY-MM-DD (toISOString would shift evening dates to the next day in UTC) */
+function dateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/* How many alarm chips fit in a cell before collapsing to "+N more" */
+const MAX_VISIBLE_ALARMS = 2;
+
 // shrink title so it fits the cell, cat
 function abbreviateTitle(title) {
   if (!title) return "";
@@ -95,7 +106,7 @@ export default function CalendarGrid({ calendarDays, currentDate, alarms, onDayC
         // earliest to latest, cat
         const dayAlarms = date
           ? alarms
-              .filter(a => a.time?.startsWith(date.toISOString().split("T")[0]))
+              .filter(a => a.time?.startsWith(dateKey(date)))
               .sort((a, b) => new Date(a.time) - new Date(b.time))
           : [];
         return (
@@ -128,7 +139,7 @@ export default function CalendarGrid({ calendarDays, currentDate, alarms, onDayC
                     </span>
                   )}
                 </div>
-                {dayAlarms.map((alarm, idx) => (
+                {dayAlarms.slice(0, MAX_VISIBLE_ALARMS).map((alarm, idx) => (
                   <div
                     key={idx}
                     className="alarm"
@@ -146,6 +157,9 @@ export default function CalendarGrid({ calendarDays, currentDate, alarms, onDayC
                     />
                   </div>
                 ))}
+                {dayAlarms.length > MAX_VISIBLE_ALARMS && (
+                  <span className="alarm-more">+{dayAlarms.length - MAX_VISIBLE_ALARMS} more</span>
+                )}
               </>
             )}
           </div>
@@ -169,4 +183,4 @@ export default function CalendarGrid({ calendarDays, currentDate, alarms, onDayC
       )}
     </div>
   );
-}
+}

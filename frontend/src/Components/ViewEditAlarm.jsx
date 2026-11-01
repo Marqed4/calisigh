@@ -1,20 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
-import "./AddAlarm.css";
-
-const BG_MAP = {
-  barn: DefaultBackgrounds.Barn,
-  lakeside: DefaultBackgrounds.Lake,
-  peace: DefaultBackgrounds.Peace,
-  silos: DefaultBackgrounds.Silo,
-  summer: DefaultBackgrounds.Summer,
-  tree: DefaultBackgrounds.Tree,
-  fall: DefaultBackgrounds.Fall,
-  winter: DefaultBackgrounds.Winter,
-};
-
+import { getBackground } from "./backgrounds.js";
+import { repeatIsos } from "./alarmUtils.js";
 import "./AddAlarm.css";
 import "./ViewEditAlarm.css";
 
@@ -32,10 +20,12 @@ export default function ViewEditAlarm() {
 
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [futureDate, setFutureDate] = useState("");
-
   const [repeatMode, setRepeatMode] = useState("weekly");
+  const titleRef = useRef(null);
 
-  const bg = BG_MAP[localStorage.getItem("calisigh-bg") ?? "fall"];
+  const bg = getBackground();
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
 
   async function saveAlarm() {
     if (!title || !time) { setError("Title and time are required."); return; }
@@ -51,29 +41,18 @@ export default function ViewEditAlarm() {
     } catch { setError("Failed to save. Is the server running?"); }
   }
 
+  /* Creates the repeats AFTER this alarm (this one already exists) */
   async function duplicateAlarm() {
     if (!futureDate) { setError("End date is required."); return; }
-
-    const [futureYear, futureMonth, futureDay] = futureDate.split("-");
-    const futureIso = `${futureYear}-${String(futureMonth).padStart(2, "0")}-${String(futureDay).padStart(2, "0")}T${time}:00`;
-    let date = new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}:00`);
-
     try {
-      while (date.toISOString().slice(0, 16) <= futureIso) {
-        const movingIso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${time}:00`;
+      for (const iso of repeatIsos({ year, month, day, time, endDate: futureDate, mode: repeatMode })) {
         await fetch("http://localhost:4567/api/alarms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ time: movingIso, title, desc }),
+          body: JSON.stringify({ time: iso, title, desc }),
         });
-        await emit("alarm-saved");
-        
-        if (repeatMode === "weekly") {
-          date.setDate(date.getDate() + 7);
-        } else {
-          date.setFullYear(date.getFullYear() + 1);
-        }
       }
+      await emit("alarm-saved");
       await getCurrentWindow().close();
     } catch { setError("Failed to duplicate. Is the server running?"); }
   }
@@ -86,15 +65,24 @@ export default function ViewEditAlarm() {
     } catch { setError("Failed to delete. Is the server running?"); }
   }
 
+  /* Enter saves (or confirms the repeat panel), Esc cancels */
+  function handleKeyDown(e) {
+    if (e.key === "Escape") getCurrentWindow().close();
+    else if (e.key === "Enter" && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "BUTTON") {
+      e.preventDefault();
+      if (showDuplicate) duplicateAlarm(); else saveAlarm();
+    }
+  }
+
   return (
     <>
       <div className="alarm-background" style={{ backgroundImage: `url(${bg})` }} />
-      <div className="alarm-window">
+      <div className="alarm-window" onKeyDown={handleKeyDown}>
         <h2>Edit Alarm</h2>
         <p>{`${month}/${day}/${year}`}</p>
         {error && <p className="alarm-error">{error}</p>}
 
-        <input type="text" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input ref={titleRef} type="text" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <textarea placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
 

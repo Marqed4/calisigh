@@ -88,3 +88,18 @@
   background: #888;
   cursor: not-allowed;
 }
+.alarm-firing-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.alarm-firing-actions .alarm-firing-stop {
+  margin-top: 0;
+  padding: 4px 14px;
+  font-size: 0.82rem;
+}
+
+.alarm-firing-snooze {
+  background: rgba(255, 255, 255, 0.14);
+}

@@ -47,3 +47,55 @@
   height: 45px;
   width: auto;
 }
+.today-btn {
+  position: fixed;
+  bottom: 1rem;
+  left: calc(50% + 120px);
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 18px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.today-btn:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.undo-toast {
+  position: fixed;
+  bottom: 3.5rem;
+  left: calc(50% + 120px);
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(20, 20, 20, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  color: #e8e8e8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.undo-toast button {
+  background: rgba(120, 180, 255, 0.18);
+  border: none;
+  border-radius: 6px;
+  color: #90c8ff;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.undo-toast button:hover {
+  background: rgba(120, 180, 255, 0.32);
+}

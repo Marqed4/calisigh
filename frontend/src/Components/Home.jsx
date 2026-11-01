@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import Settings from "../resources/assets/images/Signs/Settings.gif";
-import { useFontTheme } from "./FontPackage.jsx";
-import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
+import { useFontTheme, DEFAULT_FONT } from "./FontPackage.jsx";
+import { getBackground } from "./backgrounds.js";
 import MonthYearDisplay from "./MonthYearDisplay.jsx";
 import ViewYears from "./ViewYears.jsx";
 import CalendarGrid from "./CalendarGrid.jsx";
@@ -12,27 +11,6 @@ import Sidebar from "./Sidebar.jsx";
 import "./MonthYearDisplay.css";
 import ".//ViewYears.css"
 import "./Home.css";
-
-/* Map localStorage keys to background images */
-const BG_MAP = {
-  barn: DefaultBackgrounds.Barn,
-  lakeside: DefaultBackgrounds.Lake,
-  peace: DefaultBackgrounds.Peace,
-  silos: DefaultBackgrounds.Silo,
-  summer: DefaultBackgrounds.Summer,
-  tree: DefaultBackgrounds.Tree,
-  fall: DefaultBackgrounds.Fall,
-  winter: DefaultBackgrounds.Winter,
-};
-
-/* Load saved background, fall back to custom paths, then default to fall */
-function getBackground() {
-  const saved = localStorage.getItem("calisigh-bg") ?? "fall";
-  if (BG_MAP[saved]) return BG_MAP[saved];
-  const customs = JSON.parse(localStorage.getItem("calisigh-custom-bgs") ?? "[]");
-  const entry = customs.find(e => e.split("|&")[0] === saved);
-  return entry ? convertFileSrc(entry.split("|&")[1]) : BG_MAP["fall"];
-}
 
 /* Read a boolean toggle from localStorage, defaults to true if not set */
 function readToggle(key) {
@@ -94,6 +72,9 @@ export default function Home() {
 
   const Main = useRef(null);
   const alarmWindowOpen = useRef(false);
+  const pollerRef = useRef(null);
+  const undoTimer = useRef(null);
+  const [lastDeleted, setLastDeleted] = useState(null);
 
   const [bg, setBg] = useState(getBackground());
 
@@ -104,7 +85,7 @@ export default function Home() {
       setShowFederal(readToggle("calisigh-holidays-federal"));
       setShowObservance(readToggle("calisigh-holidays-observance"));
       setShowReligious(readToggle("calisigh-holidays-religious"));
-      setFontTheme(localStorage.getItem("calisigh-font") ?? "graffiti");
+      setFontTheme(localStorage.getItem("calisigh-font") ?? DEFAULT_FONT);
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -112,8 +93,9 @@ export default function Home() {
 
   /* On mount, wait for backend then load alarms and start the firing poller */
   useEffect(() => {
+    let cancelled = false;
     waitForBackend().then(ready => {
-      if (ready) {
+      if (ready && !cancelled) {
         loadAlarms();
         startAlarmFiringPoller();
       }
@@ -122,10 +104,28 @@ export default function Home() {
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => {
+      cancelled = true;
+      clearInterval(pollerRef.current);
+      clearTimeout(undoTimer.current);
       unlisten.then(f => f());
       window.removeEventListener("resize", updateSize);
     };
   }, []);
+
+  /* Keyboard shortcuts: left/right = month, T = today, Esc = leave year view */
+  useEffect(() => {
+    function onKeyDown(e) {
+      const tag = e.target?.tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "Escape" && isYearView) setIsYearView(false);
+      else if (!isYearView && e.key === "ArrowLeft")  changeMonth(-1);
+      else if (!isYearView && e.key === "ArrowRight") changeMonth(1);
+      else if (e.key === "t" || e.key === "T") goToday();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isYearView]);
 
   /* Reload holidays when the year or any toggle changes */
   useEffect(() => {
@@ -172,7 +172,8 @@ export default function Home() {
 
   /* Check every second if an alarm is firing, open the alert window if so */
   function startAlarmFiringPoller() {
-    setInterval(async () => {
+    clearInterval(pollerRef.current);
+    pollerRef.current = setInterval(async () => {
       try {
         const res = await fetch("http://localhost:4567/api/alarms/firing");
         if (!res.ok) return;
@@ -193,7 +194,7 @@ export default function Home() {
               resizable: false,
               center: true,
               width: 320,
-              height: 280,
+              height: 320,
               title: "Alarm",
               alwaysOnTop: true,
               skipTaskbar: false,
@@ -220,16 +221,37 @@ export default function Home() {
     }
   }
 
+  /* Delete, then offer a few seconds to undo it */
   async function deleteAlarm(alarm) {
     try {
       await fetch("http://localhost:4567/api/alarms", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ time: alarm.time }),
+        body: JSON.stringify({ id: alarm.id, time: alarm.time }),
+      });
+      loadAlarms();
+      clearTimeout(undoTimer.current);
+      setLastDeleted(alarm);
+      undoTimer.current = setTimeout(() => setLastDeleted(null), 6000);
+    } catch (err) {
+      console.error("Failed to delete alarm:", err);
+    }
+  }
+
+  async function undoDelete() {
+    const alarm = lastDeleted;
+    if (!alarm) return;
+    clearTimeout(undoTimer.current);
+    setLastDeleted(null);
+    try {
+      await fetch("http://localhost:4567/api/alarms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ time: alarm.time, title: alarm.title, desc: alarm.desc ?? "" }),
       });
       loadAlarms();
     } catch (err) {
-      console.error("Failed to delete alarm:", err);
+      console.error("Failed to restore alarm:", err);
     }
   }
 
@@ -242,7 +264,7 @@ export default function Home() {
   async function openEditWindow(alarm) {
     const dt = new Date(alarm.time);
     const query = new URLSearchParams({
-      id: alarm.time,
+      id: alarm.id ?? alarm.time,
       title: alarm.title,
       desc: alarm.desc ?? "",
       day: dt.getDate(),
@@ -255,11 +277,20 @@ export default function Home() {
 
   const openSettingsWindow = () => openWindow("view-settings", "/view-settings", { title: "Settings" });
 
+  /* Always land on the 1st so Jan 31 + 1 month can't skip February */
   function changeMonth(offset) {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + offset);
-    setCurrentDate(newDate);
+    setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + offset, 1));
   }
+
+  function goToday() {
+    setCurrentDate(new Date());
+    setIsYearView(false);
+  }
+
+  const now = new Date();
+  const isCurrentMonth =
+    currentDate.getFullYear() === now.getFullYear() &&
+    currentDate.getMonth() === now.getMonth();
 
   function getCalendarDays(date) {
     const year = date.getFullYear();
@@ -310,6 +341,17 @@ export default function Home() {
             </>
           )}
         </main>
+        {!isCurrentMonth && (
+          <button className="today-btn" onClick={goToday} title="Jump to the current month (T)">
+            Today
+          </button>
+        )}
+        {lastDeleted && (
+          <div className="undo-toast">
+            <span>Alarm deleted</span>
+            <button onClick={undoDelete}>Undo</button>
+          </div>
+        )}
         <a
           className="settings-link"
           title="Calisigh's Settings"
@@ -323,4 +365,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
+}

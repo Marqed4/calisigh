@@ -1,22 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import Send from "../resources/assets/images/Signs/Semi Reflective Guitar.gif";
-import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
+import { getBackground } from "./backgrounds.js";
 import "./Chat.css";
 
-const appWindow = getCurrentWebviewWindow();
+const FALLBACK_GREETING = "Hey... like, what do you want?";
 
-const BG_MAP = {
-  barn: DefaultBackgrounds.Barn,
-  lakeside: DefaultBackgrounds.Lake,
-  peace: DefaultBackgrounds.Peace,
-  silos: DefaultBackgrounds.Silo,
-  summer: DefaultBackgrounds.Summer,
-  tree: DefaultBackgrounds.Tree,
-  fall: DefaultBackgrounds.Fall,
-  winter: DefaultBackgrounds.Winter,
-};
+function buildAlarmContext(alarms) {
+  return alarms.length > 0
+    ? `The user's calendar events are: ${alarms.map(a =>
+        `"${a.title}" at ${new Date(a.time).toLocaleString()}${a.desc ? ` (${a.desc})` : ""}`
+      ).join("; ")}.`
+    : "The user has no calendar events.";
+}
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -24,66 +19,47 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [alarms, setAlarms] = useState([]);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const [bg, setBg] = useState(null);
+  /* Same resolver as every other window, so custom backgrounds work here too */
+  const bg = getBackground();
 
-  useEffect(() => {
-    async function init() {
-        let loadedAlarms = [];
-        try {
-            const res = await fetch("http://localhost:4567/api/alarms");
-            loadedAlarms = await res.json();
-            setAlarms(loadedAlarms);
-        } catch (_) {}
+  /* Fetch alarms and ask the backend for a fresh greeting. Also used by "New chat". */
+  async function startConversation() {
+    setMessages([]);
+    let loadedAlarms = [];
+    try {
+      const res = await fetch("http://localhost:4567/api/alarms");
+      loadedAlarms = await res.json();
+      setAlarms(loadedAlarms);
+    } catch (_) {}
 
-        const alarmContext = loadedAlarms.length > 0
-            ? `The user's calendar events are: ${loadedAlarms.map(a =>
-                `"${a.title}" at ${new Date(a.time).toLocaleString()}${a.desc ? ` (${a.desc})` : ""}`
-              ).join("; ")}.`
-            : "The user has no calendar events.";
-
-        setLoading(true);
-        try {
-            const res = await fetch("http://localhost:4567/api/chat/greeting", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ alarmContext }),
-            });
-            const data = await res.json();
-            setMessages([{ role: "assistant", content: data.reply ?? "Hey... like, what do you want?" }]);
-        } catch (_) {
-            setMessages([{ role: "assistant", content: "Hey... like, what do you want?" }]);
-        }
-        setLoading(false);
-      }
-      init();
-  }, []);
-
-  useEffect(() => {
-    async function loadBg() {
-      const savedBg = localStorage.getItem("calisigh-bg") ?? "fall";
-
-      if (BG_MAP[savedBg]) {
-        setBg(BG_MAP[savedBg]);
-        return;
-      }
-
-      // supporting custom background, but only updates upon forcereload
-      try {
-        const res = await fetch("http://localhost:4567/api/backgrounds");
-        const data = await res.json();
-        const entry = data.find(e => e.split("|&")[0] === savedBg);
-        if (entry) {
-          setBg(convertFileSrc(entry.split("|&")[1]));
-        } else {
-          setBg(BG_MAP["fall"]);
-        }
-      } catch {
-        setBg(BG_MAP["fall"]);
-      }
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:4567/api/chat/greeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alarmContext: buildAlarmContext(loadedAlarms) }),
+      });
+      const data = await res.json();
+      setMessages([{ role: "assistant", content: data.reply ?? FALLBACK_GREETING }]);
+    } catch (_) {
+      setMessages([{ role: "assistant", content: FALLBACK_GREETING }]);
     }
-    loadBg();
-  }, []);
+    setLoading(false);
+  }
+
+  useEffect(() => { startConversation(); }, []);
+
+  /* Keep the newest message in view */
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  /* Put the cursor back in the box whenever a reply finishes */
+  useEffect(() => {
+    if (!loading) inputRef.current?.focus();
+  }, [loading]);
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -93,15 +69,10 @@ export default function Chat() {
     setInput("");
     setLoading(true);
     try {
-      const alarmContext = alarms.length > 0
-        ? `The user's calendar events are: ${alarms.map(a =>
-            `"${a.title}" at ${new Date(a.time).toLocaleString()}${a.desc ? ` (${a.desc})` : ""}`
-          ).join("; ")}.`
-        : "The user has no calendar events.";
       const response = await fetch("http://localhost:4567/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alarmContext, messages: newMessages }),
+        body: JSON.stringify({ alarmContext: buildAlarmContext(alarms), messages: newMessages }),
       });
       const data = await response.json();
       const reply = data.reply ?? "...whatever, I got nothing. Try again I guess.";
@@ -109,7 +80,7 @@ export default function Chat() {
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", content: "Great, something broke. not surprised honestly. Try again." }]);
     }
-    setLoading(false); 
+    setLoading(false);
   };
 
   const handleKeyDown = (e) => {
@@ -125,6 +96,14 @@ export default function Chat() {
       <div className="chat-wrapper">
         <div className="chat-header">
           <span>Calisigh Helper</span>
+          <button
+            className="chat-close"
+            onClick={startConversation}
+            disabled={loading}
+            title="Clear this conversation and start over"
+          >
+            New chat
+          </button>
         </div>
         <div className="chat-messages">
           {messages.map((msg, i) => (
@@ -141,6 +120,7 @@ export default function Chat() {
         </div>
         <div className="chat-input-row">
           <textarea
+            ref={inputRef}
             className="chat-input"
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -149,9 +129,9 @@ export default function Chat() {
             rows={2}
           />
           <button className="chat-send" onClick={sendMessage} disabled={loading}>
-            <img src={Send} 
+            <img src={Send}
             alt="Send"
-            className="chat-send" 
+            className="chat-send"
             />
           </button>
         </div>
