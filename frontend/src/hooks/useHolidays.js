@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { holidays as holidaysApi } from "../lib/api.js";
 
 /* Holidays for a year as { "YYYY-MM-DD": [holiday, ...] }, limited to the categories switched on */
-export function useHolidays(year, toggles) {
+export function useHolidays(year, toggles, refresh = 0) {
   const [holidays, setHolidays] = useState({});
   const { federal, observance, religious } = toggles;
 
@@ -24,7 +24,7 @@ export function useHolidays(year, toggles) {
         setHolidays(byDate);
       })
       .catch(err => console.error("Failed to load holidays:", err));
-  }, [year, federal, observance, religious]);
+  }, [year, federal, observance, religious, refresh]);
 
   return holidays;
 }

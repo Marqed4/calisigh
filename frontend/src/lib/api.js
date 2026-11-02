@@ -38,8 +38,36 @@ export const alarms = {
   clearFiring: () => send("/api/alarms/firing", "DELETE"),
 };
 
+/* Bookmarks and presets: {marks: {alarmId: {bookmarked, preset}}, presets: [...]} */
+export const marks = {
+  get: async () => {
+    try {
+      const data = await getJson("/api/marks");
+      return { marks: data.marks ?? {}, presets: data.presets ?? [] };
+    } catch (_) {
+      return { marks: {}, presets: [] };
+    }
+  },
+  set: (id, mark) => send(`/api/marks/${id}`, "PUT", mark),
+  savePresets: (presets) => send("/api/presets", "PUT", presets),
+};
+
 export const holidays = {
   forYear: (year, categories) => getJson(`/api/holidays?year=${year}&categories=${categories.join(",")}`),
+  /* {set, country}; the key itself never comes back */
+  keyStatus: async () => {
+    try {
+      return await getJson("/api/holidays/key");
+    } catch (_) {
+      return { set: true, country: "US" };   // unknown, so do not nag
+    }
+  },
+  /* The backend checks the key with Calendarific; throws with its message when it is rejected */
+  saveKey: async (key, country) => {
+    const res = await send("/api/holidays/key", "PUT", { key, country });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || "Could not save the key.");
+  },
 };
 
 export const sounds = {
@@ -71,7 +99,10 @@ export const chat = {
     create: async () => (await send("/api/chat/sessions", "POST")).json(),
     get: (id) => getJson(`/api/chat/sessions/${id}`),
     remove: (id) => send(`/api/chat/sessions/${id}`, "DELETE"),
-    addMessage: (id, role, content) => send(`/api/chat/sessions/${id}/messages`, "POST", { role, content }),
+    /* card is the JSON text of an event card, or "" when the message has none; the response holds messageId */
+    addMessage: (id, role, content, card = "") => send(`/api/chat/sessions/${id}/messages`, "POST", { role, content, card }),
+    /* Stores the new state of a card once it is used, so a resumed session shows it as done */
+    setCard: (messageId, card) => send(`/api/chat/messages/${messageId}/card`, "PUT", { card }),
   },
   models: {
     list: async () => {

@@ -135,6 +135,67 @@ public final class CalendarificHolidays
         }
     }
 
+    /** True when a real key is set, in config.properties or the environment. */
+    public static boolean hasKey()
+    {
+        return Config.load().apiKey != null;
+    }
+
+    public static String country()
+    {
+        return Config.load().country;
+    }
+
+    /**
+     * Tries the key with one real request, and only when Calendarific accepts it writes it into
+     * config.properties. The year it fetched is cached, so the holidays show up right away.
+     */
+    public static void saveKey(String key, String country) throws IOException, InterruptedException
+    {
+        String cleanKey = key == null ? "" : key.trim();
+        String cleanCountry = country == null || country.isBlank()
+            ? DEFAULT_COUNTRY : country.trim().toUpperCase(Locale.ROOT);
+        if (cleanKey.isEmpty() || cleanKey.equals(PLACEHOLDER_KEY) || cleanKey.length() > 100)
+            throw new IOException("Paste the API key from your Calendarific account.");
+        if (!cleanCountry.matches("[A-Z]{2}"))
+            throw new IOException("The country is a two letter code, like US or GB.");
+
+        int year = java.time.LocalDate.now().getYear();
+        List<Holiday> fresh;
+        try { fresh = fetch(new Config(cleanKey, cleanCountry), year); }
+        catch (IOException e) { throw new IOException("Calendarific did not accept that key. Check it and try again."); }
+
+        try { Database.get().putCached("calendarific-" + cleanCountry, year, GSON.toJson(fresh)); }
+        catch (SQLException e) { LOGGER.log(Level.WARNING, "Couldn't cache holidays for " + year, e); }
+
+        writeConfig(cleanKey, cleanCountry);
+        lastFailure.clear();
+        warnedNoKey = false;
+    }
+
+    // Keeps the comments and any other lines the user added
+    private static void writeConfig(String key, String country) throws IOException
+    {
+        File f = SystemDirectory.Directory("config.properties");
+        f.getParentFile().mkdirs();
+        List<String> lines = f.exists()
+            ? new ArrayList<>(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8))
+            : new ArrayList<>(List.of(CONFIG_TEMPLATE.split("\n")));
+
+        setLine(lines, "calendarific.api.key", key);
+        setLine(lines, "calendarific.country", country);
+        Files.write(f.toPath(), lines, StandardCharsets.UTF_8);
+    }
+
+    private static void setLine(List<String> lines, String name, String value)
+    {
+        for (int i = 0; i < lines.size(); i++)
+        {
+            if (lines.get(i).startsWith(name + "=")) { lines.set(i, name + "=" + value); return; }
+        }
+        lines.add(name + "=" + value);
+    }
+
     private static List<Holiday> fetch(Config cfg, int year) throws IOException, InterruptedException
     {
         URI uri = URI.create(API_URL

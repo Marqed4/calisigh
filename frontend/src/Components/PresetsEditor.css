@@ -1,0 +1,78 @@
+.presets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.presets-hint {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.preset-row {
+  display: flex;
+  gap: 6px;
+}
+
+.preset-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.preset-remove:hover {
+  color: var(--danger);
+}
+
+.preset-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.preset-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.preset-swatch-on {
+  border-color: var(--text);
+}
+
+.preset-color {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.preset-text {
+  resize: vertical;
+  min-height: 56px;
+}

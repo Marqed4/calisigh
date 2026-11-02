@@ -5,6 +5,12 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 /* Windows tell each other that alarms changed through this one event */
 const ALARMS_CHANGED = "alarm-saved";
 
+/* ...and this one when the holiday key was saved, so the main window loads the holidays */
+const HOLIDAYS_CHANGED = "holiday-key-saved";
+
+export const notifyHolidaysChanged = () => emit(HOLIDAYS_CHANGED);
+export const onHolidaysChanged = (callback) => listen(HOLIDAYS_CHANGED, callback);
+
 export const notifyAlarmsChanged = () => emit(ALARMS_CHANGED);
 export const onAlarmsChanged = (callback) => listen(ALARMS_CHANGED, callback);
 export const closeThisWindow = () => getCurrentWindow().close();
@@ -50,6 +56,8 @@ export function openEditAlarmWindow(alarm) {
     year: dt.getFullYear(),
     time: alarm.time.slice(11, 16),
     image: alarm.image ?? "",
+    bookmarked: alarm.bookmarked ? "1" : "",
+    preset: alarm.presetId ?? "",
   });
   return openWindow("view-edit-alarm", `/view-edit-alarm?${query}`);
 }

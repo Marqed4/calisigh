@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ViewYears from "./ViewYears.jsx";
 import CalendarGrid from "./CalendarGrid.jsx";
 import WeekView from "./WeekView.jsx";
 import Sidebar from "./Sidebar.jsx";
+import EventSearch from "./EventSearch.jsx";
+import HolidayPrompt from "./HolidayPrompt.jsx";
 import { ChevronLeft, ChevronRight, Settings as SettingsIcon } from "./Icons.jsx";
 import { useAlarms } from "../hooks/useAlarms.js";
 import { useAppSettings } from "../hooks/useAppSettings.js";
 import { useFiringAlarm } from "../hooks/useFiringAlarm.js";
 import { useHolidays } from "../hooks/useHolidays.js";
 import { addDays, weekLabel } from "../lib/calendarUtils.js";
+import { emptyFilters, findEvents, isActive, matchKey } from "../lib/eventSearch.js";
 import { savedView } from "../lib/settings.js";
-import { openAddAlarmWindow, openEditAlarmWindow, openSettingsWindow } from "../lib/windows.js";
+import { onHolidaysChanged, openAddAlarmWindow, openEditAlarmWindow, openSettingsWindow } from "../lib/windows.js";
 import "./Home.css";
 
 const VIEWS = [
@@ -25,9 +28,22 @@ export default function Home() {
   const [view, setViewState] = useState(() => savedView.read(VIEW_KEYS));
 
   const { bg, toggles, look } = useAppSettings();
-  const { alarms, ready, lastDeleted, remove, undo } = useAlarms();
-  const holidays = useHolidays(currentDate.getFullYear(), toggles);
+  const { alarms, ready, lastDeleted, remove, undo, toggleBookmark } = useAlarms();
+  /* Bumped when a holiday key is saved, so the holidays load without a restart */
+  const [holidayRefresh, setHolidayRefresh] = useState(0);
+  const holidays = useHolidays(currentDate.getFullYear(), toggles, holidayRefresh);
+
+  useEffect(() => {
+    const unlisten = onHolidaysChanged(() => setHolidayRefresh(n => n + 1));
+    return () => { unlisten.then(stop => stop()); };
+  }, []);
   useFiringAlarm(ready);
+
+  /* One search drives both the dropdown list and the highlighted cells */
+  const [filters, setFilters] = useState(emptyFilters);
+  const searching = isActive(filters);
+  const matches = useMemo(() => findEvents(alarms, filters), [alarms, filters]);
+  const matchedKeys = useMemo(() => new Set(matches.map(matchKey)), [matches]);
 
   function setView(key) {
     setViewState(key);
@@ -43,13 +59,14 @@ export default function Home() {
 
   const goToday = () => setCurrentDate(new Date());
 
-  /* Left/right = previous/next, T = today, M/W/Y = view, Esc = leave year view */
+  /* Left/right = previous/next, T = today, M/W/Y = view, Esc = clear search, or leave year view */
   useEffect(() => {
     function onKeyDown(e) {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target?.tagName)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
-      if (e.key === "Escape" && view === "year") setView("month");
+      if (e.key === "Escape" && searching) setFilters(emptyFilters());
+      else if (e.key === "Escape" && view === "year") setView("month");
       else if (e.key === "ArrowLeft") step(-1);
       else if (e.key === "ArrowRight") step(1);
       else if (key === "t") goToday();
@@ -59,7 +76,7 @@ export default function Home() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [view]);
+  }, [view, searching]);
 
   const now = new Date();
   const isCurrent =
@@ -81,6 +98,9 @@ export default function Home() {
     onDayClick: openAddAlarmWindow,
     onEditAlarm: openEditAlarmWindow,
     onDeleteAlarm: remove,
+    onBookmarkAlarm: toggleBookmark,
+    matchedKeys,
+    searching,
   };
 
   return (
@@ -91,6 +111,7 @@ export default function Home() {
           alarms={alarms}
           onSelectDate={setCurrentDate}
           onEditAlarm={openEditAlarmWindow}
+          onJumpToAlarm={(date) => { setCurrentDate(date); setView("month"); }}
         />
         <main className="main">
           <header className="toolbar">
@@ -109,6 +130,12 @@ export default function Home() {
             <h1 className="toolbar-title">{title}</h1>
 
             <div className="toolbar-end">
+              <EventSearch
+                filters={filters}
+                onChange={setFilters}
+                matches={matches}
+                onPick={(date) => { setCurrentDate(date); setView("month"); }}
+              />
               <div className="segmented" role="tablist" aria-label="Calendar view">
                 {VIEWS.map(v => (
                   <button
@@ -149,6 +176,8 @@ export default function Home() {
             )}
           </div>
         </main>
+
+        <HolidayPrompt ready={ready} />
 
         {lastDeleted && (
           <div className="undo-toast" role="status">

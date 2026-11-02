@@ -1,0 +1,115 @@
+.event-search {
+  position: relative;
+  width: 190px;
+}
+
+.event-search-input {
+  padding-right: 26px;
+}
+
+.event-search-clear {
+  position: absolute;
+  top: 9px;
+  right: 6px;
+  display: inline-flex;
+  padding: 3px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.event-search-clear:hover {
+  color: var(--text);
+}
+
+.event-search-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 290px;
+  padding: 4px;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.event-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 4px;
+}
+
+.event-search-count {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--match, #f2c14e);
+}
+
+.event-search-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px 6px 8px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.event-search-filters .input {
+  margin-top: 2px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+}
+
+.event-search-results {
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.event-search-results button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-search-results button:hover,
+.event-search-results button:focus-visible {
+  background: var(--surface-hover);
+}
+
+.event-search-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.event-search-when {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.event-search-empty {
+  padding: 6px 8px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}

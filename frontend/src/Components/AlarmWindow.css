@@ -28,6 +28,24 @@
   height: 72px;
 }
 
+/* Clickable web addresses from the description */
+.alarm-links {
+  max-height: 64px;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+.alarm-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
 .alarm-window .segmented {
   width: 100%;
 }

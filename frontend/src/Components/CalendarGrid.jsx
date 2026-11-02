@@ -1,15 +1,28 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Close } from "./Icons.jsx";
+import { Close, Star } from "./Icons.jsx";
+import Money from "./Money.jsx";
+import { presetStyle } from "../lib/presets.js";
+import { randomPattern, renderPattern } from "../lib/asciiPatterns.js";
 import { WEEKDAYS_SHORT, alarmsOn, dateKey, formatTime, getMonthCells, isSameDay } from "../lib/calendarUtils.js";
+import { matchKey } from "../lib/eventSearch.js";
 import "./CalendarGrid.css";
 
 /* Chips shown per cell before "+N more" */
 const MAX_VISIBLE_ALARMS = 2;
 
-export function AlarmChip({ alarm, onEdit, onDelete }) {
+/* Picked once per launch: the ASCII art behind today's cell */
+const TODAY_ART = renderPattern(randomPattern().tile);
+
+export function AlarmChip({ alarm, matched, dimmed, onEdit, onDelete, onBookmark }) {
+  const style = {
+    ...presetStyle(alarm.preset),
+    ...(alarm.image && { "--picture": `url("${convertFileSrc(alarm.image)}")` }),
+  };
+
   return (
     <div
-      className="chip"
+      className={`chip${alarm.image ? " chip-picture" : ""}${alarm.bookmarked ? " chip-bookmarked" : ""}${matched ? " chip-match" : ""}${dimmed ? " chip-dim" : ""}`}
+      style={style}
       role="button"
       tabIndex={0}
       title={alarm.desc ? `${alarm.title}\n${alarm.desc}` : alarm.title}
@@ -23,7 +36,16 @@ export function AlarmChip({ alarm, onEdit, onDelete }) {
       }}
     >
       <span className="chip-time">{formatTime(alarm.time)}</span>
-      <span className="chip-title">{alarm.title}</span>
+      <span className="chip-title"><Money text={alarm.title} /></span>
+      <button
+        className="chip-star"
+        aria-label={alarm.bookmarked ? `Remove bookmark from ${alarm.title}` : `Bookmark ${alarm.title}`}
+        aria-pressed={alarm.bookmarked}
+        title={alarm.bookmarked ? "Remove bookmark" : "Bookmark"}
+        onClick={(e) => { e.stopPropagation(); onBookmark(alarm); }}
+      >
+        <Star size={12} filled={alarm.bookmarked} />
+      </button>
       <button
         className="chip-delete"
         aria-label={`Delete ${alarm.title}`}
@@ -36,7 +58,7 @@ export function AlarmChip({ alarm, onEdit, onDelete }) {
   );
 }
 
-export default function CalendarGrid({ currentDate, alarms, holidays = {}, onDayClick, onEditAlarm, onDeleteAlarm, onShowDay }) {
+export default function CalendarGrid({ currentDate, alarms, holidays = {}, onDayClick, onEditAlarm, onDeleteAlarm, onBookmarkAlarm, onShowDay, matchedKeys, searching }) {
   const today = new Date();
   const cells = getMonthCells(currentDate);
 
@@ -50,17 +72,20 @@ export default function CalendarGrid({ currentDate, alarms, holidays = {}, onDay
           const outside = date.getMonth() !== currentDate.getMonth();
           const isToday = isSameDay(date, today);
           const holiday = holidays[dateKey(date)];
-          const dayAlarms = alarmsOn(alarms, date);
+          const isMatch = (a) => Boolean(searching && matchedKeys?.has(matchKey(a)));
+          /* While searching, matches go first so they are never hidden behind "+N more" (stable sort keeps time order) */
+          const dayAlarms = alarmsOn(alarms, date).sort((a, b) => isMatch(b) - isMatch(a));
           const hidden = dayAlarms.length - MAX_VISIBLE_ALARMS;
-          const picture = dayAlarms.find(a => a.image)?.image;
+          const dayHasMatch = dayAlarms.some(isMatch);
+          const hiddenHasMatch = dayAlarms.slice(MAX_VISIBLE_ALARMS).some(isMatch);
 
           return (
             <div
               key={date.getTime()}
-              className={`cell${outside ? " cell-outside" : ""}${isToday ? " cell-today" : ""}${picture ? " has-picture" : ""}`}
-              style={picture ? { "--picture": `url("${convertFileSrc(picture)}")` } : undefined}
+              className={`cell${outside ? " cell-outside" : ""}${isToday ? " cell-today" : ""}${dayHasMatch ? " cell-match" : ""}`}
               onClick={() => onDayClick(date)}
             >
+              {isToday && <pre className="cell-ascii" aria-hidden="true">{TODAY_ART}</pre>}
               <div className="cell-head">
                 <span className="cell-number">{date.getDate()}</span>
                 {holiday && (
@@ -73,13 +98,16 @@ export default function CalendarGrid({ currentDate, alarms, holidays = {}, onDay
                 <AlarmChip
                   key={alarm.id ?? alarm.time}
                   alarm={alarm}
+                  matched={isMatch(alarm)}
+                  dimmed={searching && !isMatch(alarm)}
                   onEdit={onEditAlarm}
                   onDelete={onDeleteAlarm}
+                  onBookmark={onBookmarkAlarm}
                 />
               ))}
               {hidden > 0 && (
                 <button
-                  className="cell-more"
+                  className={`cell-more${hiddenHasMatch ? " cell-more-match" : ""}`}
                   onClick={(e) => { e.stopPropagation(); onShowDay(date); }}
                 >
                   +{hidden} more

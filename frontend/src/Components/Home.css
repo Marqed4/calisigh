@@ -72,5 +72,5 @@
 }
 
 .undo-toast button:hover {
-  background: rgba(138, 180, 255, 0.34);
+  background: var(--accent-strong);
 }

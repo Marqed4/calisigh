@@ -1,0 +1,54 @@
+.holiday-key {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.holiday-key-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.holiday-key-link {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.holiday-key-row {
+  display: flex;
+  gap: 6px;
+}
+
+.holiday-key-country {
+  flex: 0 0 48px;
+  width: 48px;
+  text-align: center;
+}
+
+.holiday-key-status {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.holiday-key-status--error {
+  color: var(--danger);
+}
+
+.holiday-key-status--done {
+  color: #4caf7d;
+}
+
+.holiday-key-status--saving {
+  color: var(--text-dim);
+}

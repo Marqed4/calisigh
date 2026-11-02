@@ -1,0 +1,37 @@
+.holiday-prompt {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 40px));
+  padding: 16px;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+.holiday-prompt h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.holiday-prompt p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.holiday-prompt-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.holiday-prompt-foot {
+  font-size: 0.74rem;
+}

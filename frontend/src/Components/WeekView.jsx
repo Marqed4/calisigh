@@ -1,10 +1,9 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { Plus } from "./Icons.jsx";
 import { AlarmChip } from "./CalendarGrid.jsx";
 import { WEEKDAYS_SHORT, alarmsOn, dateKey, getWeekDays, isSameDay } from "../lib/calendarUtils.js";
 import "./WeekView.css";
 
-export default function WeekView({ currentDate, alarms, holidays = {}, onDayClick, onEditAlarm, onDeleteAlarm }) {
+export default function WeekView({ currentDate, alarms, holidays = {}, onDayClick, onEditAlarm, onDeleteAlarm, onBookmarkAlarm }) {
   const today = new Date();
   const days = getWeekDays(currentDate);
 
@@ -14,13 +13,11 @@ export default function WeekView({ currentDate, alarms, holidays = {}, onDayClic
         const isToday = isSameDay(date, today);
         const holiday = holidays[dateKey(date)];
         const dayAlarms = alarmsOn(alarms, date);
-        const picture = dayAlarms.find(a => a.image)?.image;
 
         return (
           <section
             key={date.getTime()}
-            className={`week-col${isToday ? " week-col-today" : ""}${picture ? " has-picture" : ""}`}
-            style={picture ? { "--picture": `url("${convertFileSrc(picture)}")` } : undefined}
+            className={`week-col${isToday ? " week-col-today" : ""}`}
             onClick={() => onDayClick(date)}
           >
             <header className="week-col-head">
@@ -40,6 +37,7 @@ export default function WeekView({ currentDate, alarms, holidays = {}, onDayClic
                   alarm={alarm}
                   onEdit={onEditAlarm}
                   onDelete={onDeleteAlarm}
+                  onBookmark={onBookmarkAlarm}
                 />
               ))}
             </div>

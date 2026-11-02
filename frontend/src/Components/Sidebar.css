@@ -169,24 +169,52 @@
 }
 
 /* AI date range */
-.range-fields {
+.range-presets {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.range-presets button {
+  padding: 5px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.range-presets button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.range-presets button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.range-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .range-fields label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  font-size: 0.7rem;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
   color: var(--text-dim);
 }
 
 .range-fields input {
   min-width: 0;
-  padding: 5px 6px;
+  padding: 5px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -204,13 +232,4 @@
   margin-top: 6px;
   font-size: 0.72rem;
   color: var(--text-dim);
-}
-
-.range-clear {
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
 }

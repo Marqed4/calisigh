@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import HighlightInput from "./HighlightInput.jsx";
 import PicturePicker from "./PicturePicker.jsx";
-import { alarms } from "../lib/api.js";
+import PresetSelect, { usePresets } from "./PresetSelect.jsx";
+import { alarms, marks } from "../lib/api.js";
 import { closeThisWindow, finishAlarmEdit } from "../lib/windows.js";
 import { getBackground } from "../lib/backgrounds.js";
 import { repeatIsos } from "../lib/alarmUtils.js";
+import { formatTotals, sumAmounts } from "../lib/money.js";
 import "./AlarmWindow.css";
 
 export default function AddAlarm() {
@@ -19,13 +22,31 @@ export default function AddAlarm() {
   const [repeatMode, setRepeatMode] = useState("none"); // none | weekly | yearly
   const [endDate, setEndDate] = useState("");
   const [imagePath, setImagePath] = useState("");
+  const [presetId, setPresetId] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
   const titleRef = useRef(null);
+  const presets = usePresets();
 
+  const typedTotal = formatTotals(sumAmounts([{ title, desc }]));
   const bg = getBackground();
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
-  const post = (iso) => alarms.create({ time: iso, title, desc, imageSource: imagePath });
+  /* A preset only fills the title and text that are still empty */
+  function choosePreset(id, preset) {
+    setPresetId(id);
+    if (!preset) return;
+    if (!title && preset.title) setTitle(preset.title);
+    if (!desc && preset.desc) setDesc(preset.desc);
+  }
+
+  async function post(iso) {
+    const res = await alarms.create({ time: iso, title, desc, imageSource: imagePath });
+    if (presetId || bookmarked) {
+      const { id } = await res.json();
+      if (id) await marks.set(id, { bookmarked, preset: presetId });
+    }
+  }
 
   async function saveAlarm() {
     if (!title || !time) {
@@ -72,26 +93,34 @@ export default function AddAlarm() {
         <h2>Add Alarm</h2>
         <p className="alarm-window-date">{`${month}/${day}/${year}`}</p>
         {error && <p className="form-error">{error}</p>}
-        <input
+        <HighlightInput
           ref={titleRef}
           className="input"
-          type="text"
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        <textarea
+        <HighlightInput
+          multiline
           className="input"
           placeholder="Description"
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
         />
+        {typedTotal && <p className="alarm-money-total">Amounts here add up to {typedTotal}</p>}
         <input
           className="input"
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
         />
+
+        <PresetSelect presets={presets} value={presetId} onChange={choosePreset} />
+
+        <label className="alarm-check">
+          <input type="checkbox" checked={bookmarked} onChange={(e) => setBookmarked(e.target.checked)} />
+          Bookmark this event
+        </label>
 
         <PicturePicker path={imagePath} onChange={setImagePath} />
 

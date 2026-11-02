@@ -35,7 +35,8 @@ public class Database
     /** One row of the sounds or backgrounds table. path is relative to the Calisigh folder when it lives inside it. */
     public record MediaRow(String name, String path) {}
     public record ChatSessionRow(long id, String startedAt, String title, int messageCount) {}
-    public record ChatMessageRow(String role, String content) {}
+    /** card is the JSON of an event card (add, edit or delete) shown under the message, or empty */
+    public record ChatMessageRow(long id, String role, String content, String card) {}
 
     private static Database instance;
 
@@ -94,6 +95,7 @@ public class Database
                 + "role TEXT NOT NULL, "
                 + "content TEXT NOT NULL)");
             st.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
+            ensureColumn(st, "chat_messages", "card", "TEXT NOT NULL DEFAULT ''");
         }
 
         migrateLegacyEvents();
@@ -144,6 +146,20 @@ public class Database
         {
             rs.next();
             return new AlarmRecord(rs.getLong(1), time, title, desc == null ? "" : desc, imageToApi(image));
+        }
+    }
+
+    /** null when no alarm has that id */
+    public synchronized AlarmRecord findAlarm(long id) throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement(
+            "SELECT id, time, title, description, image FROM alarms WHERE id = ?"))
+        {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery())
+            {
+                return rs.next() ? alarmFrom(rs) : null;
+            }
         }
     }
 
@@ -521,16 +537,24 @@ public class Database
         }
     }
 
-    // The first user message becomes the session title
-    public synchronized void addChatMessage(long sessionId, String role, String content) throws SQLException
+    // The first user message becomes the session title; returns the new message's id
+    public synchronized long addChatMessage(long sessionId, String role, String content, String card) throws SQLException
     {
+        long messageId;
         try (PreparedStatement ps = conn.prepareStatement(
-            "INSERT INTO chat_messages(session_id, role, content) VALUES(?,?,?)"))
+            "INSERT INTO chat_messages(session_id, role, content, card) VALUES(?,?,?,?)"))
         {
             ps.setLong(1, sessionId);
             ps.setString(2, role);
             ps.setString(3, content);
+            ps.setString(4, card == null ? "" : card);
             ps.executeUpdate();
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT last_insert_rowid()"))
+        {
+            rs.next();
+            messageId = rs.getLong(1);
         }
         if ("user".equals(role))
         {
@@ -543,6 +567,23 @@ public class Database
                 ps.setLong(2, sessionId);
                 ps.executeUpdate();
             }
+        }
+        return messageId;
+    }
+
+    public synchronized long addChatMessage(long sessionId, String role, String content) throws SQLException
+    {
+        return addChatMessage(sessionId, role, content, "");
+    }
+
+    /** Called when a card is used, so a resumed session shows it as done. */
+    public synchronized boolean setChatMessageCard(long messageId, String card) throws SQLException
+    {
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE chat_messages SET card = ? WHERE id = ?"))
+        {
+            ps.setString(1, card == null ? "" : card);
+            ps.setLong(2, messageId);
+            return ps.executeUpdate() > 0;
         }
     }
 
@@ -582,12 +623,12 @@ public class Database
     {
         List<ChatMessageRow> out = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-            "SELECT role, content FROM chat_messages WHERE session_id = ? ORDER BY id"))
+            "SELECT id, role, content, card FROM chat_messages WHERE session_id = ? ORDER BY id"))
         {
             ps.setLong(1, sessionId);
             try (ResultSet rs = ps.executeQuery())
             {
-                while (rs.next()) out.add(new ChatMessageRow(rs.getString(1), rs.getString(2)));
+                while (rs.next()) out.add(new ChatMessageRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4)));
             }
         }
         return out;

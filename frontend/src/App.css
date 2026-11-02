@@ -20,7 +20,9 @@
   --border: color-mix(in srgb, var(--trim) var(--trim-strength), transparent);
 
   --accent: #8ab4ff;
-  --accent-soft: rgba(138, 180, 255, 0.2);
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 34%, transparent);
+  --on-accent: #0c1220;
   --holiday: #ffd479;
   --danger: #ff8a8a;
 
@@ -163,7 +165,7 @@ button {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: rgba(138, 180, 255, 0.34);
+  background: var(--accent-strong);
   border-color: transparent;
 }
 
@@ -240,22 +242,25 @@ button {
   --border: color-mix(in srgb, var(--trim) 60%, transparent);
 }
 
-/* A day with a picture attached to an alarm becomes that picture, with a light fade so the text stays readable */
-.has-picture,
-.has-picture:hover {
-  background: linear-gradient(rgba(10, 10, 16, 0.1), rgba(10, 10, 16, 0.4)), var(--picture) center / cover;
-  backdrop-filter: none;
+/* Web addresses inside event details and chat cards */
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
-.has-picture .cell-number,
-.has-picture .cell-holiday,
-.has-picture .week-col-number,
-.has-picture .week-col-name {
+.link:hover {
+  filter: brightness(1.2);
+}
+
+/* An event with a picture shows it on its own chip, with a fade so the text stays readable */
+.chip-picture,
+.chip-picture:hover {
+  min-height: 34px;
+  background: linear-gradient(rgba(10, 10, 16, 0.15), rgba(10, 10, 16, 0.65)), var(--picture) center / cover;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
-}
-
-.has-picture .chip {
-  background: rgba(14, 14, 20, 0.72);
 }
 
 /* Trim finishes. The colour comes from --trim, set from Settings (lib/trim.js). */
@@ -317,4 +322,112 @@ button {
 *::-webkit-scrollbar-thumb {
   background: var(--trim-fill);
   border-radius: 0;
+}
+
+/* More finishes. Each one sets the same variables as the finishes above; shimmer and sparkle also
+   add a light layer over cells and buttons. The accent colour comes from --accent (lib/trim.js). */
+:root[data-trim="stainless"] {
+  --trim-strength: 50%;
+  --trim-fill:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 1px, rgba(0, 0, 0, 0.14) 1px 2px),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--trim) 55%, white),
+      color-mix(in srgb, var(--trim) 85%, black) 55%,
+      color-mix(in srgb, var(--trim) 60%, white));
+  --trim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-trim="shimmer"] {
+  --trim-strength: 50%;
+  --trim-fill: linear-gradient(90deg,
+    color-mix(in srgb, var(--trim) 60%, black),
+    color-mix(in srgb, var(--trim) 50%, white) 50%,
+    color-mix(in srgb, var(--trim) 60%, black));
+  --trim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-trim="sparkle"] {
+  --trim-strength: 55%;
+  --trim-fill: linear-gradient(90deg,
+    color-mix(in srgb, var(--trim) 55%, white),
+    var(--trim) 45%,
+    color-mix(in srgb, var(--trim) 75%, black));
+  --trim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 6px color-mix(in srgb, var(--trim) 35%, transparent);
+}
+
+/* Glass: see-through panels, stronger blur. The "Blur behind cells" switch still turns the blur off. */
+:root[data-trim="transparent"] {
+  --panel: rgba(16, 16, 22, 0.28);
+  --surface: rgba(255, 255, 255, 0.04);
+  --blur: blur(18px) saturate(1.3);
+  --trim-strength: 40%;
+  --trim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+:root[data-trim="transparent"] .cell:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+:root[data-trim="transparent"] .cell-outside {
+  background: rgba(16, 16, 22, 0.1);
+}
+
+:root[data-trim="shimmer"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented),
+:root[data-trim="sparkle"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented) {
+  position: relative;
+}
+
+/* Shimmer: a soft band of light that sweeps across, a little out of step from one box to the next */
+:root[data-trim="shimmer"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.2) 50%, transparent 62%) 0 0 / 300% 100%;
+  animation: trim-shimmer 7s ease-in-out infinite;
+}
+
+:root[data-trim="shimmer"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented):nth-child(3n)::after {
+  animation-delay: -2.3s;
+}
+
+:root[data-trim="shimmer"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented):nth-child(3n + 1)::after {
+  animation-delay: -4.6s;
+}
+
+@keyframes trim-shimmer {
+  0% { background-position: 0% 0; }
+  60%, 100% { background-position: 100% 0; }
+}
+
+/* Sparkle: tiny specks that twinkle, two layers on different timings */
+:root[data-trim="sparkle"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented)::before,
+:root[data-trim="sparkle"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.15;
+  animation: trim-twinkle 3.2s ease-in-out infinite;
+}
+
+:root[data-trim="sparkle"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented)::before {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.95) 0 1px, transparent 1.8px) 0 0 / 47px 53px,
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.8) 0 0.8px, transparent 1.5px) 0 0 / 71px 61px;
+}
+
+:root[data-trim="sparkle"] :is(.cell, .week-col, .year-month, .btn, .icon-btn, .segmented)::after {
+  background:
+    radial-gradient(circle at 60% 25%, color-mix(in srgb, var(--trim) 40%, white) 0 1px, transparent 1.8px) 0 0 / 59px 43px,
+    radial-gradient(circle at 30% 75%, rgba(255, 255, 255, 0.85) 0 0.8px, transparent 1.5px) 0 0 / 83px 79px;
+  animation-duration: 4.1s;
+  animation-delay: -1.7s;
+}
+
+@keyframes trim-twinkle {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 1; }
 }
