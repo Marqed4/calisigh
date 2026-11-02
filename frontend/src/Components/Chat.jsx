@@ -5,20 +5,60 @@ import { isRangeSet, rangeLabel, readRange } from "../lib/alarmRange.js";
 import { alarms as alarmsApi, chat } from "../lib/api.js";
 import { loadAlarmContext } from "../lib/chatContext.js";
 import { notifyAlarmsChanged } from "../lib/windows.js";
+import { Close, Paperclip } from "./Icons.jsx";
+import HighlightInput from "./HighlightInput.jsx";
 import EventCard from "./EventCard.jsx";
 import ModelPicker from "./ModelPicker.jsx";
 import "./Chat.css";
 
 const FALLBACK_GREETING = "Hey... like, what do you want?";
 
+/* Text is read by whichever model is chosen (the backend trims each to 20000 characters).
+   Pictures go to Ollama as images, so the model has to be a vision model. */
+const DOCUMENT_TYPES = ".txt,.md,.csv,.json,.ics,.log,.html,.xml,.tsv,.png,.jpg,.jpeg";
+const MAX_DOCUMENTS = 3;
+const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function readBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function sessionDate(iso) {
   return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-async function saveMessage(sessionId, role, content) {
+/* Returns the id the backend gave the message (needed later to save its card), or null */
+async function saveMessage(sessionId, role, content, card) {
   try {
-    await chat.sessions.addMessage(sessionId, role, content);
-  } catch (_) {}
+    const res = await chat.sessions.addMessage(sessionId, role, content, card ? JSON.stringify(card) : "");
+    const data = await res.json();
+    return data.messageId ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/* The card a reply carries: a new event, or a change to one that exists */
+function cardFrom(data) {
+  if (data.suggestion) return { kind: "add", proposal: data.suggestion, done: false };
+  if (data.change) return { kind: data.change.kind, change: data.change, done: false };
+  return null;
+}
+
+function parseCard(text) {
+  if (!text) return null;
+  try {
+    const card = JSON.parse(text);
+    return card && card.kind ? card : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 export default function Chat() {
@@ -32,6 +72,10 @@ export default function Chat() {
   const [showHistory, setShowHistory] = useState(false);
   const [guitar, setGuitar] = useState(() => Math.floor(Math.random() * GUITARS.length));
   const [sessions, setSessions] = useState([]);
+  /* Documents the assistant can read, kept for this conversation only */
+  const [documents, setDocuments] = useState([]);
+  const [attachError, setAttachError] = useState("");
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -52,6 +96,8 @@ export default function Chat() {
     setSessionId(null);
     setResumeOffer(null);
     setShowHistory(false);
+    setDocuments([]);
+    setAttachError("");
     setLoading(true);
     const range = readRange();
     let reply = FALLBACK_GREETING;
@@ -79,7 +125,9 @@ export default function Chat() {
     setResumeOffer(null);
     try {
       const data = await chat.sessions.get(id);
-      setMessages(data.messages ?? []);
+      setMessages((data.messages ?? []).map(m => ({
+        role: m.role, content: m.content, dbId: m.id, card: parseCard(m.card),
+      })));
       setSessionId(id);
     } catch (_) {
       startNewConversation();
@@ -135,28 +183,102 @@ export default function Chat() {
     try {
       /* Read fresh so main-window changes apply right away */
       const range = readRange();
-      const data = await chat.reply({ sessionId: id, alarmContext: await loadAlarmContext(range), messages: newMessages });
+      const data = await chat.reply({ sessionId: id, alarmContext: await loadAlarmContext(range), messages: newMessages, documents });
       const reply = data.reply ?? "...whatever, I got nothing. Try again I guess.";
-      setMessages(prev => [...prev, { role: "assistant", content: reply, suggestion: data.suggestion }]);
-      if (id !== null) saveMessage(id, "assistant", reply);
+      const card = cardFrom(data);
+      /* Saved with its card first, so the card can be marked used later and survives a resume */
+      const dbId = id !== null ? await saveMessage(id, "assistant", reply, card) : null;
+      setMessages(prev => [...prev, { role: "assistant", content: reply, card, dbId }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", content: "Great, something broke. not surprised honestly. Try again." }]);
     }
     setLoading(false);
   };
 
-  /* An event the assistant proposed becomes a real alarm, its considerations saved as the description */
-  async function addSuggestion(index) {
-    const { suggestion } = messages[index];
+  /*
+  Runs a card the user pressed: adds an event, saves a change or deletes one. This is the only
+  place the assistant's proposals touch the calendar, and only after a press.
+  */
+  async function runCard(index) {
+    const { card, busy, dbId } = messages[index];
+    if (!card || card.done || busy) return;
+    const mark = (changes) => setMessages(prev => prev.map((m, i) => (i === index ? { ...m, ...changes } : m)));
+    mark({ busy: true, error: "" });
     try {
-      await alarmsApi.create({
-        time: suggestion.time,
-        title: suggestion.title,
-        desc: (suggestion.notes ?? []).map(note => `- ${note}`).join("\n"),
-      });
+      await applyCard(card);
       await notifyAlarmsChanged();
-      setMessages(prev => prev.map((m, i) => (i === index ? { ...m, added: true } : m)));
-    } catch (_) {}
+      const used = { ...card, done: true };
+      mark({ card: used, busy: false });
+      if (dbId) chat.sessions.setCard(dbId, JSON.stringify(used)).catch(() => {});
+    } catch (err) {
+      console.error("Could not apply the card:", err);
+      mark({ busy: false, error: err.userMessage ?? "Could not do that. Is the server running? Try again." });
+    }
+  }
+
+  /* The alarm routes hand back the fetch response, so a 4xx or 5xx must not count as success */
+  async function applyCard(card) {
+    if (card.kind === "add") {
+      const { proposal } = card;
+      const res = await alarmsApi.create({
+        time: proposal.time,
+        title: proposal.title,
+        desc: (proposal.notes ?? []).map(note => `- ${note}`).join("\n"),
+      });
+      if (res && res.ok === false) throw new Error(`Server answered ${res.status}`);
+      return;
+    }
+
+    const { change } = card;
+    if (card.kind === "delete") {
+      const res = await alarmsApi.remove(change.id);
+      /* already gone counts as deleted */
+      if (res && res.ok === false && res.status !== 404) throw new Error(`Server answered ${res.status}`);
+      return;
+    }
+
+    /* Edit: start from the event as it is now, so its notes are kept and a later change is not undone */
+    const current = (await alarmsApi.list()).find(a => a.id === change.id);
+    if (!current) {
+      const gone = new Error("event gone");
+      gone.userMessage = "That event is not on your calendar anymore, so there is nothing to change.";
+      throw gone;
+    }
+    const res = await alarmsApi.update(change.id, {
+      time: change.newTime ?? current.time,
+      title: change.newTitle ?? current.title,
+      desc: current.desc ?? "",
+    });
+    if (res && res.ok === false) throw new Error(`Server answered ${res.status}`);
+  }
+
+  async function attachFiles(e) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    setAttachError("");
+    for (const file of files) {
+      if (documents.length + 1 > MAX_DOCUMENTS) {
+        setAttachError(`Up to ${MAX_DOCUMENTS} documents at a time.`);
+        break;
+      }
+      const isImage = file.type.startsWith("image/");
+      if (file.size > (isImage ? MAX_IMAGE_BYTES : MAX_TEXT_BYTES)) {
+        setAttachError(`${file.name} is over ${isImage ? 8 : 2} MB.`);
+        continue;
+      }
+      try {
+        if (isImage) {
+          const image = await readBase64(file);
+          setDocuments(prev => [...prev, { name: file.name, image }]);
+          continue;
+        }
+        const text = await file.text();
+        if (text.includes("\u0000")) throw new Error("binary");
+        setDocuments(prev => [...prev, { name: file.name, text }]);
+      } catch (_) {
+        setAttachError(`${file.name} is not a plain text file.`);
+      }
+    }
   }
 
   /* Every click on the button swaps the guitar */
@@ -246,8 +368,8 @@ export default function Chat() {
                 <div className={`chat-bubble ${msg.role}`}>
                   {msg.content}
                 </div>
-                {msg.suggestion && (
-                  <EventCard proposal={msg.suggestion} added={msg.added} onAdd={() => addSuggestion(i)} />
+                {msg.card && (
+                  <EventCard card={msg.card} busy={msg.busy} error={msg.error} onRun={() => runCard(i)} />
                 )}
               </div>
             ))}
@@ -260,8 +382,47 @@ export default function Chat() {
           </div>
         )}
 
+        {(documents.length > 0 || attachError) && (
+          <div className="chat-attachments">
+            {documents.map((d, i) => (
+              <span key={i} className="chat-attachment" title={d.name}>
+                <span className="chat-attachment-name">{d.name}</span>
+                <button
+                  aria-label={`Remove ${d.name}`}
+                  onClick={() => setDocuments(prev => prev.filter((_, j) => j !== i))}
+                >
+                  <Close size={12} />
+                </button>
+              </span>
+            ))}
+            {attachError && <span className="chat-attach-error">{attachError}</span>}
+            {documents.some(d => d.image) && (
+              <span className="chat-attach-note">Pictures only work if your chosen model can see images.</span>
+            )}
+          </div>
+        )}
+
         <div className="chat-input-row">
-          <textarea
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={DOCUMENT_TYPES}
+            multiple
+            hidden
+            onChange={attachFiles}
+          />
+          <button
+            className="icon-btn chat-attach"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            aria-label="Attach a document"
+            title="Attach a text file (txt, md, csv, json, ics) or a picture (png, jpg). What the assistant can read depends on the model you picked: pictures need a vision model like llama3.2-vision, gemma3 or llava."
+          >
+            <Paperclip size={18} />
+          </button>
+          <HighlightInput
+            multiline
+            wrapClassName="chat-input-wrap"
             ref={inputRef}
             className="input chat-input"
             value={input}

@@ -1,21 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { alarms as alarmsApi, waitForBackend } from "../lib/api.js";
+import { alarms as alarmsApi, marks as marksApi, waitForBackend } from "../lib/api.js";
 import { alarmKey, dedupeAlarms } from "../lib/alarmUtils.js";
-import { onAlarmsChanged } from "../lib/windows.js";
+import { findPreset } from "../lib/presets.js";
+import { notifyAlarmsChanged, onAlarmsChanged } from "../lib/windows.js";
 
 const UNDO_MS = 6000;
 
-/* All alarms, kept fresh, plus delete with a short undo window */
+/* All alarms with their bookmark and preset, kept fresh, plus delete with a short undo window */
 export function useAlarms() {
   const [all, setAll] = useState([]);
-  const alarms = useMemo(() => dedupeAlarms(all), [all]);
+  const [markData, setMarkData] = useState({ marks: {}, presets: [] });
   const [ready, setReady] = useState(false);
   const [lastDeleted, setLastDeleted] = useState(null);
   const undoTimer = useRef(null);
 
+  const alarms = useMemo(() => dedupeAlarms(all).map(a => {
+    const mark = markData.marks[a.id];
+    return {
+      ...a,
+      bookmarked: Boolean(mark?.bookmarked),
+      presetId: mark?.preset ?? "",
+      preset: findPreset(markData.presets, mark?.preset),
+    };
+  }), [all, markData]);
+
   const reload = useCallback(async () => {
     try {
-      setAll(await alarmsApi.list());
+      const [list, marksAndPresets] = await Promise.all([alarmsApi.list(), marksApi.get()]);
+      setAll(list);
+      setMarkData(marksAndPresets);
     } catch (err) {
       console.error("Failed to load alarms:", err);
     }
@@ -58,12 +71,26 @@ export function useAlarms() {
     clearTimeout(undoTimer.current);
     setLastDeleted(null);
     try {
-      await alarmsApi.create({ time: alarm.time, title: alarm.title, desc: alarm.desc ?? "", imageSource: alarm.image ?? "" });
+      const res = await alarmsApi.create({ time: alarm.time, title: alarm.title, desc: alarm.desc ?? "", imageSource: alarm.image ?? "" });
+      const { id } = await res.json();
+      if (id && (alarm.bookmarked || alarm.presetId)) {
+        await marksApi.set(id, { bookmarked: alarm.bookmarked, preset: alarm.presetId });
+      }
       reload();
     } catch (err) {
       console.error("Failed to restore alarm:", err);
     }
   }
 
-  return { alarms, ready, lastDeleted, remove, undo };
+  async function toggleBookmark(alarm) {
+    try {
+      await marksApi.set(alarm.id, { bookmarked: !alarm.bookmarked, preset: alarm.presetId });
+      await reload();
+      notifyAlarmsChanged();
+    } catch (err) {
+      console.error("Failed to change bookmark:", err);
+    }
+  }
+
+  return { alarms, ready, lastDeleted, remove, undo, toggleBookmark };
 }

@@ -45,6 +45,17 @@ export const Volume = p => (
 export const Upload = p => (
   <Icon {...p}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" /></Icon>
 );
+export const Star = ({ filled, ...p }) => (
+  <Icon {...p}>
+    <path
+      d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"
+      fill={filled ? "currentColor" : "none"}
+    />
+  </Icon>
+);
+export const Paperclip = p => (
+  <Icon {...p}><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 01-7.8-7.8l8.6-8.6a3.7 3.7 0 015.2 5.2l-8.6 8.6a1.8 1.8 0 01-2.6-2.6l7.9-7.9" /></Icon>
+);
 export const Image = p => (
   <Icon {...p}>
     <rect x="3" y="3" width="18" height="18" rx="2" />

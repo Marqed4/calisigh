@@ -11,6 +11,7 @@ import com.google.gson.Gson;
 import static spark.Spark.delete;
 import static spark.Spark.get;
 import static spark.Spark.post;
+import static spark.Spark.put;
 
 /* Saved chat sessions */
 public class ChatHistory {
@@ -66,13 +67,36 @@ public class ChatHistory {
                     res.status(400);
                     return gson.toJson(new Error("Need an existing session, a role and content."));
                 }
-                Database.get().addChatMessage(id, body.role.equals("assistant") ? "assistant" : "user", body.content);
-                return gson.toJson(new Created(id));
+                long messageId = Database.get().addChatMessage(id, body.role.equals("assistant") ? "assistant" : "user", body.content, body.card);
+                return gson.toJson(new Saved(id, messageId));
             } catch (NumberFormatException e) {
                 res.status(400);
                 return gson.toJson(new Error("Session id must be a number."));
             } catch (Exception e) {
                 return fail(res, "POST /api/chat/sessions/:id/messages failed", e);
+            }
+        });
+
+        // A card was used (added, changed or deleted): store its new state
+        put("/api/chat/messages/:id/card", (req, res) -> {
+            res.type("application/json");
+            try {
+                long id = Long.parseLong(req.params(":id"));
+                NewMessage body = gson.fromJson(req.body(), NewMessage.class);
+                if (body == null || body.card == null) {
+                    res.status(400);
+                    return gson.toJson(new Error("Need a card."));
+                }
+                if (!Database.get().setChatMessageCard(id, body.card)) {
+                    res.status(404);
+                    return gson.toJson(new Error("Message not found."));
+                }
+                return gson.toJson(new Created(id));
+            } catch (NumberFormatException e) {
+                res.status(400);
+                return gson.toJson(new Error("Message id must be a number."));
+            } catch (Exception e) {
+                return fail(res, "PUT /api/chat/messages/:id/card failed", e);
             }
         });
 
@@ -101,7 +125,12 @@ public class ChatHistory {
     }
 
     static class NewMessage {
-        String role, content;
+        String role, content, card;
+    }
+
+    static class Saved {
+        long id, messageId;
+        Saved(long id, long messageId) { this.id = id; this.messageId = messageId; }
     }
 
     static class Created {

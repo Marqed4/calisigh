@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Bell } from "./Icons.jsx";
+import Linkified from "./Linkified.jsx";
 import { getBackground } from "../lib/backgrounds.js";
 import { toLocalIso, toHHMM } from "../lib/alarmUtils.js";
 import { alarms, sounds } from "../lib/api.js";
@@ -61,7 +62,7 @@ export default function AlarmFiring() {
       <div className="alarm-firing-window">
         <div className="alarm-firing-icon"><Bell size={34} /></div>
         <h2 className="alarm-firing-title">{title}</h2>
-        {desc && <p className="alarm-firing-desc">{desc}</p>}
+        {desc && <p className="alarm-firing-desc"><Linkified text={desc} /></p>}
         <div className="alarm-firing-actions">
           <button className="btn" onClick={() => snooze(5)} disabled={stopping}>
             Snooze 5m

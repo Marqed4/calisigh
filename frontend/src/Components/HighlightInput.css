@@ -1,0 +1,53 @@
+.hl-wrap {
+  position: relative;
+}
+
+/* The field keeps its background, caret and selection; only its letters are hidden */
+.hl-field {
+  display: block;
+  color: transparent !important;
+  caret-color: var(--text);
+}
+
+.hl-field::placeholder {
+  color: var(--text-faint);
+}
+
+/* The coloured copy sits on top and lets every click through */
+.hl-back {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-style: solid;
+  border-color: transparent;
+  color: var(--text);
+}
+
+.hl-back-multi {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.hl-back-single {
+  white-space: pre;
+}
+
+.hl-money {
+  color: var(--money, #4caf7d);
+}
+
+.hl-url {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Running total under the description while typing */
+.alarm-money-total {
+  margin: -4px 0 0;
+  font-size: 0.76rem;
+  color: var(--money, #4caf7d);
+}

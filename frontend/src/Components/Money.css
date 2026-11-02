@@ -1,0 +1,11 @@
+/* Change --money to recolour every amount */
+.money {
+  color: var(--money, #4caf7d);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money-symbol {
+  opacity: 0.75;
+}

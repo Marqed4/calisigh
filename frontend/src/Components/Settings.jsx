@@ -3,12 +3,15 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { DefaultBackgrounds } from "../resources/assets/images/Backgrounds/index.js";
 import { Close, Upload, Volume } from "./Icons.jsx";
-import { backgrounds, sounds } from "../lib/api.js";
+import { backgrounds, holidays as holidaysApi, sounds } from "../lib/api.js";
 import { saveBackground, savedBgKey } from "../lib/backgrounds.js";
 import { appearance, holidayToggles } from "../lib/settings.js";
 import { closeThisWindow } from "../lib/windows.js";
 import { applyFont, listFonts, saveFont, savedFont } from "../lib/fonts.js";
-import { FINISHES, SWATCHES, applyTrim, saveTrim, savedTrim } from "../lib/trim.js";
+import PresetsEditor from "./PresetsEditor.jsx";
+import HolidayKeyForm from "./HolidayKeyForm.jsx";
+import { applyTrim, saveTrim, savedTrim } from "../lib/trim.js";
+import ThemePicker from "./ThemePicker.jsx";
 import "./Settings.css";
 
 const BG_MAP = [
@@ -32,6 +35,7 @@ export default function Settings() {
   const flip = (name) => setToggles(t => ({ ...t, [name]: !t[name] }));
   const [font, setFont] = useState(savedFont);
   const [fonts, setFonts] = useState([]);
+  const [keyStatus, setKeyStatus] = useState(null);
   const [trim, setTrim] = useState(savedTrim);
 
   /* Preview a trim change right away; Cancel puts the saved one back */
@@ -62,6 +66,7 @@ export default function Settings() {
 
   useEffect(() => {
     listFonts().then(setFonts);
+    holidaysApi.keyStatus().then(setKeyStatus);
     loadBackgrounds();
     loadSounds();
     loadVolume();
@@ -241,6 +246,13 @@ export default function Settings() {
               </button>
             </div>
 
+            <div className="settings-holiday-key">
+              <span className="settings-toggle-label">
+                Holiday key {keyStatus && (keyStatus.set ? "(set)" : "(not set, holidays are off)")}
+              </span>
+              <HolidayKeyForm country={keyStatus?.country} onSaved={() => holidaysApi.keyStatus().then(setKeyStatus)} />
+            </div>
+
             <div className="settings-font-row">
               <span className="settings-toggle-label">Font</span>
               <input
@@ -259,41 +271,7 @@ export default function Settings() {
               {font && <button className="settings-font-reset" onClick={() => { setFont(""); applyFont(""); }}>Default</button>}
             </div>
 
-            <div className="settings-trim">
-              <span className="settings-toggle-label">Trim finish and colour</span>
-              <div className="segmented" role="tablist" aria-label="Trim finish">
-                {FINISHES.map(f => (
-                  <button
-                    key={f.key}
-                    role="tab"
-                    aria-selected={trim.finish === f.key}
-                    className={`segmented-btn${trim.finish === f.key ? " segmented-active" : ""}`}
-                    onClick={() => changeTrim({ finish: f.key })}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="settings-swatches">
-                {SWATCHES.map(sw => (
-                  <button
-                    key={sw.color}
-                    className={`settings-swatch${trim.color.toLowerCase() === sw.color ? " settings-swatch-active" : ""}`}
-                    style={{ background: sw.color }}
-                    title={sw.label}
-                    aria-label={sw.label}
-                    onClick={() => changeTrim({ color: sw.color })}
-                  />
-                ))}
-                <input
-                  className="settings-color"
-                  type="color"
-                  value={trim.color}
-                  title="Pick any colour"
-                  onChange={e => changeTrim({ color: e.target.value })}
-                />
-              </div>
-            </div>
+            <ThemePicker trim={trim} onChange={changeTrim} />
 
             <div className="settings-toggle-row">
               <span className="settings-toggle-label">Blur behind cells</span>
@@ -316,6 +294,8 @@ export default function Settings() {
                 {look.sharpCells ? "On" : "Off"}
               </button>
             </div>
+
+            <PresetsEditor />
 
             <div className="settings-bg-picker">
               {BG_MAP.map(bg => (

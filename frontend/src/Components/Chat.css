@@ -124,6 +124,75 @@
   flex-shrink: 0;
 }
 
+/* The guitar sits on a see-through button */
+.chat-send,
+.chat-send:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.chat-send:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.chat-attach {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+}
+
+.chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+}
+
+.chat-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+}
+
+.chat-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-attachment button {
+  display: inline-flex;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.chat-attachment button:hover {
+  color: var(--danger);
+}
+
+.chat-attach-note {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.chat-attach-error {
+  font-size: 0.74rem;
+  color: var(--danger);
+}
+
 /* Resume question and history list */
 .chat-offer {
   display: flex;
@@ -269,4 +338,25 @@
 .event-card .btn {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+.event-card-kind {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.event-card-old {
+  text-decoration: line-through;
+}
+
+/* The highlighted input sits in a wrapper that takes the row space */
+.chat-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-input-wrap .chat-input {
+  width: 100%;
 }

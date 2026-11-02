@@ -47,7 +47,7 @@ public class DateAlarm
         synchronized (lock) { return new ArrayList<>(alarmDataList); }
     }
 
-    public void setAlarm(LocalDateTime time, String title, String desc, String image) throws SQLException
+    public AlarmRecord setAlarm(LocalDateTime time, String title, String desc, String image) throws SQLException
     {
         AlarmRecord alarm = db.insert(time, title, desc, image);
 
@@ -57,6 +57,7 @@ public class DateAlarm
             alarmDataList.add(alarm);
         }
         checkAlarm();
+        return alarm;
     }
 
     /** Exact delete by id. */

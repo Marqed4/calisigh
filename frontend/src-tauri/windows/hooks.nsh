@@ -41,9 +41,21 @@ ollama_ready:
 done:
 FunctionEnd
 
+; Holidays come from Calendarific, which needs a free key of the user's own. The key is pasted into Calisigh
+; (a prompt on first launch, or Settings), so here the installer only offers to open the sign-up page.
+Function CalisighOfferHolidayKey
+  MessageBox MB_YESNO|MB_ICONQUESTION "Calisigh can show national holidays and observances on your calendar.$\r$\n$\r$\nThey come from Calendarific, a free service, and you need your own free key (about two minutes).$\r$\n$\r$\nOpen the Calendarific sign-up page now? When you open Calisigh it will ask you to paste the key." /SD IDNO IDYES open_signup IDNO skip_signup
+
+open_signup:
+  ExecShell "open" "https://calendarific.com/signup"
+
+skip_signup:
+FunctionEnd
+
 !macro NSIS_HOOK_POSTINSTALL
   Call CreateOrUpdateDesktopShortcut
   Call CalisighInstallOllama
+  Call CalisighOfferHolidayKey
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL

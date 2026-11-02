@@ -32,6 +32,9 @@ public class AlarmRoutes {
         Boolean clearImage;   // PUT only: drop the current picture
     }
 
+    // the id lets the caller attach a bookmark or preset to the alarm it just made
+    record Created(String message, long id) {}
+
     private static AlarmRequest read(spark.Request req) {
         return Json.GSON.fromJson(req.body(), AlarmRequest.class);
     }
@@ -75,8 +78,8 @@ public class AlarmRoutes {
 
         post("/api/alarms", Routes.json("POST /api/alarms", (req, res) -> {
             AlarmRequest body = read(req);
-            dateAlarm.setAlarm(LocalDateTime.parse(body.time), body.title, body.desc, storedImage(body.imageSource));
-            return new Message("Alarm set!");
+            AlarmRecord created = dateAlarm.setAlarm(LocalDateTime.parse(body.time), body.title, body.desc, storedImage(body.imageSource));
+            return new Created("Alarm set!", created.id());
         }));
 
         delete("/api/alarms", Routes.json("DELETE /api/alarms", (req, res) -> {

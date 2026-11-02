@@ -43,8 +43,11 @@
 .alarm-firing-desc {
   margin: 0;
   max-width: 260px;
+  max-height: 90px;
+  overflow-y: auto;
   font-size: 0.9rem;
   color: var(--text-dim);
+  white-space: pre-wrap;
 }
 
 .alarm-firing-actions {

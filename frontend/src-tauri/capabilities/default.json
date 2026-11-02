@@ -10,11 +10,14 @@
         { "url": "https://www.marqed.it/*" },
         { "url": "https://www.github.com.Marqed4/*" },
         { "url": "https://www.marqed4.github.io/*" },
-        { "url": "https://www.marqed.it/CustomCalendar*" }
+        { "url": "https://www.marqed.it/CustomCalendar*" },
+        { "url": "https://*" },
+        { "url": "http://*" }
       ]
     },
     "core:default",
     "core:webview:allow-create-webview-window",
+    "core:webview:allow-set-webview-zoom",
     "core:window:allow-close",
     "core:window:allow-destroy",
     "core:window:allow-show",

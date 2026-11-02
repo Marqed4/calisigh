@@ -1,6 +1,7 @@
 package com.zachery.customcalendar;
 
 import com.zachery.customcalendar.Alarms.AlarmRoutes;
+import com.zachery.customcalendar.Alarms.EventMarks;
 import com.zachery.customcalendar.Alarms.DateAlarm;
 import com.zachery.customcalendar.Alarms.Toasts;
 import com.zachery.customcalendar.Assistant.Chat;
@@ -49,6 +50,7 @@ public class Main
         });
 
         new AlarmRoutes(dateAlarm).register();
+        new EventMarks().register();
         new MediaRoutes(alarmSounds, backgrounds).register();
         new HolidayRoutes().register();
         new Chat().register();

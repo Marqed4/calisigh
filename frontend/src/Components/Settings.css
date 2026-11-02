@@ -92,7 +92,7 @@
 }
 
 .settings-toggle-btn--on:hover {
-  background: rgba(138, 180, 255, 0.32);
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 /* Background picker */
@@ -299,6 +299,13 @@
 }
 
 /* Font picker: any font installed on the computer */
+.settings-holiday-key {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+
 .settings-font-row {
   display: flex;
   align-items: center;
