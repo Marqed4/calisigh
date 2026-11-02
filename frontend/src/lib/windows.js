@@ -75,7 +75,7 @@ export async function openChatWindow() {
     }
     const win = new WebviewWindow("view-chat-assistant", {
       url: "/view-chat-assistant",
-      title: "Chat",
+      title: "Calisigh Chat",
       width: 420,
       height: 420,
       resizable: true,
