@@ -102,6 +102,7 @@ export default function AddAlarm() {
         />
         <HighlightInput
           multiline
+          wrapClassName="alarm-desc-wrap"
           className="input"
           placeholder="Description"
           value={desc}

@@ -23,9 +23,17 @@
   color: var(--text-dim);
 }
 
-.alarm-window textarea.input {
+/* The description takes whatever height the window has left */
+.alarm-desc-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 96px;
+}
+
+.alarm-desc-wrap > textarea.input {
+  flex: 1;
+  height: auto;
   resize: none;
-  height: 72px;
 }
 
 /* Clickable web addresses from the description */

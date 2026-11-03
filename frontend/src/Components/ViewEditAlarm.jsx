@@ -94,7 +94,7 @@ export default function ViewEditAlarm() {
         {error && <p className="form-error">{error}</p>}
 
         <HighlightInput ref={titleRef} className="input" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <HighlightInput multiline className="input" placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <HighlightInput multiline wrapClassName="alarm-desc-wrap" className="input" placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
         {/https?:\/\//.test(desc) && (
           <div className="alarm-links"><Linkified text={desc} /></div>
         )}

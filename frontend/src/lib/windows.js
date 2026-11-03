@@ -41,7 +41,7 @@ async function openWindow(label, url, options = {}) {
 
 export function openAddAlarmWindow(date) {
   const query = new URLSearchParams({ day: date.getDate(), month: date.getMonth() + 1, year: date.getFullYear() });
-  return openWindow("add-alarm", `/add-alarm?${query}`);
+  return openWindow("add-alarm", `/add-alarm?${query}`, { title: "Add Alarm" });
 }
 
 /* Every field goes in the URL so the edit window can fill itself without asking the backend */
@@ -59,10 +59,10 @@ export function openEditAlarmWindow(alarm) {
     bookmarked: alarm.bookmarked ? "1" : "",
     preset: alarm.presetId ?? "",
   });
-  return openWindow("view-edit-alarm", `/view-edit-alarm?${query}`);
+  return openWindow("view-edit-alarm", `/view-edit-alarm?${query}`, { title: "Edit Alarm" });
 }
 
-export const openSettingsWindow = () => openWindow("view-settings", "/view-settings", { title: "Settings" });
+export const openSettingsWindow = () => openWindow("view-settings", "/view-settings", { title: "Calisigh Settings" });
 
 export async function openChatWindow() {
   try {
