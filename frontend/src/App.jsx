@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Home from "./Components/Home.jsx";
-import AlarmFiring from "./Components/AlarmFiring.jsx";
-import AddAlarm from "./Components/AddAlarm.jsx";
-import Settings from "./Components/Settings.jsx";
-import ViewChatAssistant from "./Components/Chat.jsx";
-import ViewEditAlarm from "./Components/ViewEditAlarm.jsx";
-import { keepFontApplied } from "./lib/fonts.js";
-import { keepTrimApplied } from "./lib/trim.js";
+import Home from "./features/calendar/Home.jsx";
+import AlarmFiring from "./features/alarms/AlarmFiring.jsx";
+import AddAlarm from "./features/alarms/AddAlarm.jsx";
+import Settings from "./features/settings/Settings.jsx";
+import ViewChatAssistant from "./features/chat/Chat.jsx";
+import ViewEditAlarm from "./features/alarms/ViewEditAlarm.jsx";
+import { keepFontApplied } from "./features/appearance/fonts.js";
+import { keepTrimApplied } from "./features/appearance/trim.js";
 import "./App.css";
 
 export default function App() {

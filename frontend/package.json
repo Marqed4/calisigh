@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "clean-build" : "cd ../backend && mvn clean package && cp target/CustomCalendar.jar ../frontend/src-tauri/target/debug/ && cd ../frontend && cargo tauri dev"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

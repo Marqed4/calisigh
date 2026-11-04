@@ -33,7 +33,7 @@ public class EventMarks {
     }
 
     static class Preset {
-        String id, name, color, font, title, desc;
+        String id, name, color, font, title, desc, time;   // time is "HH:MM", or "" for none
     }
 
     static class MarksAndPresets {
@@ -109,6 +109,7 @@ public class EventMarks {
                 p.font = clip(p.font);
                 p.title = clip(p.title);
                 p.desc = clip(p.desc);
+                p.time = p.time != null && p.time.matches("\\d{2}:\\d{2}") ? p.time : "";
             }
             Database.get().setSetting(PRESETS_KEY, Json.GSON.toJson(presets));
             return new Message("Saved.");
