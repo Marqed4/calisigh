@@ -78,7 +78,7 @@
 .mini-today {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0c1220;
+  color: var(--on-accent, #0c1220);
   font-weight: 700;
 }
 

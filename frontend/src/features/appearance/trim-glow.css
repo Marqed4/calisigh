@@ -1,0 +1,23 @@
+/* Glow: a soft halo in the accent colour. Off when the Glow switch in Settings is off.
+   The [data-glow] prefix makes these win over the plain cell and chip rules whatever the load order. */
+[data-glow="on"] .cell-today,
+[data-glow="on"] .week-col-today {
+  box-shadow:
+    0 0 18px -2px color-mix(in srgb, var(--accent) 55%, transparent),
+    inset 0 0 22px -8px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+[data-glow="on"] .mini-today,
+[data-glow="on"] .year-day-today {
+  box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* Event chips glow in their preset colour, or the accent when they have none */
+[data-glow="on"] .chip:not(.chip-dim):not(.chip-match) {
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--chip-color, var(--accent)) 55%, transparent);
+  transition: box-shadow 0.15s;
+}
+
+[data-glow="on"] .chip:not(.chip-dim):not(.chip-match):hover {
+  box-shadow: 0 0 14px 0 color-mix(in srgb, var(--chip-color, var(--accent)) 75%, transparent);
+}

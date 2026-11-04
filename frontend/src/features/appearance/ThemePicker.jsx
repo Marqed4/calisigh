@@ -87,6 +87,18 @@ export default function ThemePicker({ trim, onChange }) {
           Match trim
         </button>
       </div>
+
+      <span className="settings-toggle-label">Glow</span>
+      <div className="settings-swatches">
+        <button
+          className={`settings-toggle-btn ${trim.glow !== false ? "settings-toggle-btn--on" : ""}`}
+          aria-pressed={trim.glow !== false}
+          title="A soft accent-coloured halo on today and on event chips"
+          onClick={() => onChange({ glow: trim.glow === false })}
+        >
+          {trim.glow !== false ? "On" : "Off"}
+        </button>
+      </div>
     </div>
   );
 }

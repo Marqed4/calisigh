@@ -31,5 +31,6 @@ Don't include target classes made in the backend.
 **/backend/target/*
 rust-init.exe
 CONTEXT.md
+SHOT-LIST.md
 dependency-reduced-pom.xml
 rustup-init.exe

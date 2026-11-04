@@ -60,7 +60,7 @@
 
 .year-day-today {
   background: var(--accent);
-  color: #0c1220;
+  color: var(--on-accent, #0c1220);
   font-weight: 700;
 }
 
@@ -77,5 +77,5 @@
 }
 
 .year-day-today.year-day-alarm::after {
-  background: #0c1220;
+  background: var(--on-accent, #0c1220);
 }

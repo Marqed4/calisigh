@@ -1,4 +1,4 @@
-import { WEEKDAYS_SHORT, dateKey, getMonthCells, isSameDay } from "./calendarUtils.js";
+import { dateKey, getMonthCells, isSameDay, weekdaysShort } from "./calendarUtils.js";
 import "./ViewYears.css";
 
 function MiniMonth({ year, month, alarmDays, onSelect }) {
@@ -10,7 +10,7 @@ function MiniMonth({ year, month, alarmDays, onSelect }) {
     <button className="year-month" onClick={() => onSelect(month)} aria-label={`${name} ${year}`}>
       <span className="year-month-name">{name}</span>
       <div className="year-month-grid">
-        {WEEKDAYS_SHORT.map(d => <span key={d} className="year-month-dow">{d[0]}</span>)}
+        {weekdaysShort().map(d => <span key={d} className="year-month-dow">{d[0]}</span>)}
         {cells.map(date => {
           const outside = date.getMonth() !== month;
           if (outside) return <span key={date.getTime()} />;

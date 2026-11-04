@@ -1,13 +1,15 @@
+import "./trim-glow.css";
 /*
-The theme is three picks: a finish, a trim colour and an accent colour.
+The theme is three picks (a finish, a trim colour and an accent colour) plus a glow switch.
 The trim is the thin line work of the interface: borders, the scrollbar line and the edge
 shading on cells and buttons. The accent is the highlight colour (today, primary buttons,
-active switches). App.css turns the finish (data-trim), trim colour (--trim) and accent
+active switches). The glow is a soft accent-coloured halo on today and on event chips (trim-glow.css). App.css turns the finish (data-trim), trim colour (--trim) and accent
 (--accent) into the actual look.
 */
 const FINISH_KEY = "calisigh-trim-finish";
 const COLOR_KEY = "calisigh-trim-color";
 const ACCENT_KEY = "calisigh-accent";
+const GLOW_KEY = "calisigh-glow";
 
 export const FINISHES = [
   { key: "matte", label: "Matte" },
@@ -53,8 +55,8 @@ export const THEMES = [
   { label: "Emerald plastic", finish: "plastic", color: "#4caf7d", accent: "#5eead4" },
 ];
 
-/* accent is a hex colour, or "match" to follow the trim colour */
-export const DEFAULT_TRIM = { finish: "matte", color: SWATCHES[0].color, accent: ACCENTS[0].color };
+/* accent is a hex colour, or "match" to follow the trim colour; glow is on unless it is false */
+export const DEFAULT_TRIM = { finish: "matte", color: SWATCHES[0].color, accent: ACCENTS[0].color, glow: true };
 
 const isHex = (value) => /^#[0-9a-f]{6}$/i.test(value ?? "");
 
@@ -66,13 +68,15 @@ export function savedTrim() {
     finish: FINISHES.some(f => f.key === finish) ? finish : DEFAULT_TRIM.finish,
     color: isHex(color) ? color : DEFAULT_TRIM.color,
     accent: accent === "match" || isHex(accent) ? accent : DEFAULT_TRIM.accent,
+    glow: localStorage.getItem(GLOW_KEY) !== "false",
   };
 }
 
-export function saveTrim({ finish, color, accent }) {
+export function saveTrim({ finish, color, accent, glow }) {
   localStorage.setItem(FINISH_KEY, finish);
   localStorage.setItem(COLOR_KEY, color);
   localStorage.setItem(ACCENT_KEY, accent);
+  if (glow !== undefined) localStorage.setItem(GLOW_KEY, String(glow !== false));
 }
 
 /* Dark text on light accents, white text on dark ones, so "today" and primary buttons stay readable */
@@ -85,6 +89,7 @@ export function applyTrim(trim = savedTrim()) {
   const accent = trim.accent === "match" ? trim.color : trim.accent;
   const root = document.documentElement;
   root.dataset.trim = trim.finish;
+  root.dataset.glow = trim.glow === false ? "off" : "on";
   root.style.setProperty("--trim", trim.color);
   root.style.setProperty("--accent", accent);
   root.style.setProperty("--on-accent", onAccent(accent));
@@ -93,7 +98,7 @@ export function applyTrim(trim = savedTrim()) {
 /* Applies the saved theme now and again whenever another window changes it */
 export function keepTrimApplied() {
   applyTrim();
-  const keys = [FINISH_KEY, COLOR_KEY, ACCENT_KEY];
+  const keys = [FINISH_KEY, COLOR_KEY, ACCENT_KEY, GLOW_KEY];
   const onStorage = (e) => { if (keys.includes(e.key)) applyTrim(); };
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);
