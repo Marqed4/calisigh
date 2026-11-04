@@ -1,0 +1,39 @@
+.preset-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-pick-label {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.preset-pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-pick-btn {
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--preset-color) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--preset-color) 55%, transparent);
+  border-left: 4px solid var(--preset-color);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.preset-pick-btn:hover {
+  background: color-mix(in srgb, var(--preset-color) 38%, transparent);
+}
+
+.preset-pick-on {
+  background: color-mix(in srgb, var(--preset-color) 48%, transparent);
+  border-color: var(--text);
+  border-left-color: var(--preset-color);
+}

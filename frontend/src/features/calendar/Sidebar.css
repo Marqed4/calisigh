@@ -1,0 +1,263 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 248px;
+  flex-shrink: 0;
+  padding: 18px 16px;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.sidebar-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-section,
+.sidebar-footer {
+  flex-shrink: 0;
+}
+
+.sidebar-heading {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Mini calendar */
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.mini-dow {
+  padding-bottom: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.mini-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--text);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mini-day:hover {
+  background: var(--surface-hover);
+}
+
+.mini-outside {
+  color: var(--text-faint);
+}
+
+.mini-selected {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.mini-today {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0c1220;
+  font-weight: 700;
+}
+
+.mini-today:hover {
+  background: var(--accent);
+}
+
+/* Upcoming list: scrolls inside its own box instead of spilling over the sections below */
+.sidebar-upcoming {
+  flex: 1 1 120px;
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+.sidebar-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.upcoming-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upcoming-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: none;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.upcoming-item:hover {
+  background: var(--surface-hover);
+}
+
+.upcoming-when {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.upcoming-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bookmarks: a small remove button on the right of each one */
+.bookmark-row {
+  position: relative;
+}
+
+.bookmark-row .upcoming-item {
+  padding-right: 30px;
+}
+
+.bookmark-remove {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.bookmark-remove:hover {
+  color: var(--danger);
+  background: var(--surface-hover);
+}
+
+/* Footer links */
+.sidebar-footer {
+  display: flex;
+  gap: 8px;
+}
+
+.sidebar-link {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sidebar-link:hover {
+  background: var(--surface-hover);
+}
+
+/* AI date range */
+.range-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.range-presets button {
+  padding: 5px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.range-presets button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.range-presets button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.range-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.range-fields label {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.range-fields input {
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 0.74rem;
+}
+
+.range-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
