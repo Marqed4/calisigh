@@ -53,6 +53,20 @@ export const THEMES = [
   { label: "Stainless", finish: "stainless", color: "#b8bcc6", accent: "#e6e8ee" },
   { label: "Copper stone", finish: "stone", color: "#b87333", accent: "#ff8a65" },
   { label: "Emerald plastic", finish: "plastic", color: "#4caf7d", accent: "#5eead4" },
+  { label: "Midnight onyx", finish: "matte", color: "#2b2d3a", accent: "#7c83ff" },
+  { label: "Violet glass", finish: "transparent", color: "#8e7cc3", accent: "#c4b5fd" },
+  { label: "Ocean pearl", finish: "pearl", color: "#7fb3d5", accent: "#38bdf8" },
+  { label: "Sunset shimmer", finish: "shimmer", color: "#e0703f", accent: "#fbbf24" },
+  { label: "Mint sparkle", finish: "sparkle", color: "#7fd8b5", accent: "#34d399" },
+  { label: "Titanium", finish: "stainless", color: "#8d939f", accent: "#cbd5e1" },
+  { label: "Slate stone", finish: "stone", color: "#5f6b7a", accent: "#94a3b8" },
+  { label: "Marble white", finish: "stone", color: "#e8e6e1", accent: "#a8a29e" },
+  { label: "Crimson plastic", finish: "plastic", color: "#d64550", accent: "#fb7185" },
+  { label: "Sunny plastic", finish: "plastic", color: "#f2c230", accent: "#fde047" },
+  { label: "Rose gold", finish: "stainless", color: "#d9a28f", accent: "#fda4af" },
+  { label: "Obsidian glass", finish: "transparent", color: "#1f2330", accent: "#22d3ee" },
+  { label: "Lavender matte", finish: "matte", color: "#b7a6d9", accent: "#a78bfa" },
+  { label: "Forest stone", finish: "stone", color: "#4a6b55", accent: "#86efac" },
 ];
 
 /* accent is a hex colour, or "match" to follow the trim colour; glow is on unless it is false */
