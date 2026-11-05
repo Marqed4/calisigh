@@ -2,6 +2,8 @@ import { alarms as alarmsApi } from "../../shared/lib/api.js";
 import { isRangeSet, rangeLabel, rangeQuery } from "../calendar/alarmRange.js";
 import { dedupeAlarms } from "../alarms/alarmUtils.js";
 import { dateKey } from "../calendar/calendarUtils.js";
+import { detectRange } from "./chatRange.js";
+import { appearance } from "../settings/settings.js";
 import { amountsOf, formatMoney, formatTotals, sumAmounts } from "../../shared/text/money.js";
 
 const DAYS_AHEAD = 14;
@@ -46,15 +48,20 @@ function totalLine(shown, truncated) {
 
 /*
 What the assistant is told about the calendar. Small models guess when handed a whole
-calendar, so it gets the current date and only a focused slice: the range the user picked,
-or else today and the next two weeks.
+calendar, so it gets the current date and only a focused slice: the period the message asks
+about ("next week", "in March"), else the range the user picked, else today and the next two weeks.
+The message is optional; without it the slice is chosen as before.
 */
-export async function loadAlarmContext(range) {
+export async function loadAlarmContext(range, message = "") {
   const today = new Date();
   const todayKey = dateKey(today);
   const limit = new Date(today.getFullYear(), today.getMonth(), today.getDate() + DAYS_AHEAD);
 
-  const query = isRangeSet(range) ? range : { from: todayKey, to: dateKey(limit) };
+  /* A period named in this message wins over the sidebar range, for this turn only */
+  const asked = detectRange(message, today, appearance.read().mondayStart ? 1 : 0);
+  const picked = !asked && isRangeSet(range) ? range : null;
+
+  const query = asked ? { from: asked.from, to: asked.to } : picked ?? { from: todayKey, to: dateKey(limit) };
 
   let events = [];
   try {
@@ -64,8 +71,8 @@ export async function loadAlarmContext(range) {
   const now = today.toLocaleString([], { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
   const lines = [`Right now it is ${now}.`];
 
-  if (isRangeSet(range)) {
-    const scope = rangeLabel(range);
+  if (asked || picked) {
+    const scope = asked ? asked.label : rangeLabel(picked);
     const shown = events.slice(0, MAX_EVENTS);
     lines.push(events.length
       ? `The user's calendar events for ${scope}, by day:\n${byDay(shown)}`

@@ -18,6 +18,7 @@
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100vh;
   overflow: hidden;
@@ -25,11 +26,58 @@
   font-family: var(--font-ui);
 }
 
-.settings-main {
+.settings-shell {
   flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Left navigation: Appearance, Calendar, Alert sound */
+.settings-nav {
+  width: 220px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 4px;
+  padding: 20px 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border-right: 1px solid var(--border);
+}
+
+.settings-nav .settings-title {
+  margin: 0 8px 14px;
+  font-size: 1.15rem;
+}
+
+.settings-nav-item {
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.settings-nav-item:hover {
+  background: var(--surface);
+}
+
+.settings-nav-item--active,
+.settings-nav-item--active:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -37,7 +85,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 16px 0;
+  padding: 20px 20px 12px;
 }
 
 .settings-title {
@@ -46,9 +94,39 @@
   font-weight: 600;
 }
 
-.settings-subtitle {
-  margin-bottom: 8px;
-  font-size: 0.8rem;
+.settings-section-label {
+  margin: 16px 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.settings-main-body > .settings-section-label:first-child {
+  margin-top: 0;
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 10px;
+}
+
+.settings-section-head .settings-section-label {
+  margin: 0;
+}
+
+.settings-section-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-section-note {
+  font-size: 0.82rem;
   color: var(--text-dim);
 }
 
@@ -98,8 +176,8 @@
 /* Background picker */
 .settings-bg-picker {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
   padding-bottom: 12px;
 }
 
@@ -107,7 +185,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   overflow: hidden;
   background: var(--surface);
   border: 2px solid transparent;
@@ -127,13 +205,15 @@
 .settings-bg-img {
   display: block;
   width: 100%;
-  height: 80px;
+  aspect-ratio: 16 / 10;
   object-fit: cover;
 }
 
 .settings-bg-label {
-  padding: 3px 0;
-  font-size: 0.75rem;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.35);
 }
 
 /* Small round remove button on cards */
@@ -163,50 +243,35 @@
   right: 4px;
 }
 
-/* Bottom action bars */
-.settings-actions,
-.settings-sounds-footer {
+/* Bottom bar: hint on the left, Cancel and Save on the right */
+.settings-actions {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
   background: var(--panel);
   backdrop-filter: var(--blur);
   border-top: 1px solid var(--border);
 }
 
-/* Sound column */
-.settings-sounds {
-  width: 180px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  border-left: 1px solid var(--border);
-}
-
-.settings-sounds-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 16px 10px 0;
-  overflow: hidden;
-}
-
-.sound-subtitle {
-  margin-bottom: 8px;
+.settings-hint {
   font-size: 0.85rem;
-  font-weight: 600;
+  color: var(--text-dim);
 }
 
+.settings-actions-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Alert sound page */
 .settings-volume-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 420px;
   margin-bottom: 10px;
 }
 
@@ -257,13 +322,11 @@
 }
 
 .settings-sounds-list {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-width: 420px;
   padding-bottom: 6px;
-  overflow-y: auto;
 }
 
 .settings-sound-card {
@@ -298,29 +361,12 @@
   white-space: nowrap;
 }
 
-/* Font picker: any font installed on the computer */
+/* Holiday key form */
 .settings-holiday-key {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 10px 0;
-}
-
-.settings-font-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.settings-font-row .input {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 8px;
-  font-size: 0.8rem;
 }
 
 .settings-font-reset {
@@ -332,26 +378,7 @@
   cursor: pointer;
 }
 
-/* Trim colour and finish */
-.settings-trim {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.settings-trim .segmented {
-  width: 100%;
-}
-
-.settings-trim .segmented-btn {
-  flex: 1;
-  padding: 4px 6px;
-}
-
+/* Colour swatches (used by the theme picker) */
 .settings-swatches {
   display: flex;
   align-items: center;
@@ -379,4 +406,21 @@
   background: none;
   border: none;
   cursor: pointer;
+}
+
+/* Result of adding a background, shown above the Save bar so it is always in view */
+.settings-bg-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 20px 8px;
+}
+
+.settings-bg-message p {
+  margin: 0;
+}
+
+.settings-bg-note {
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }

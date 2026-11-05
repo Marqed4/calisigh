@@ -9,6 +9,7 @@ import Fall from './Fall.gif'
 import Sandstone from './Sandstone.jpg'
 import PaleStone from './PaleStone.jpg'
 import PlasterWall from './PlasterWall.jpg'
+import StaticSand from './StaticSand.jpg'
 
 export const DefaultBackgrounds = {
   Barn: Barn,
@@ -22,4 +23,5 @@ export const DefaultBackgrounds = {
   Sandstone: Sandstone,
   PaleStone: PaleStone,
   PlasterWall: PlasterWall,
+  StaticSand: StaticSand,
 }

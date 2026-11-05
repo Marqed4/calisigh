@@ -1,26 +1,34 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { DefaultBackgrounds } from "./backgroundImages/index.js";
 
-/* Keys match what Settings saves to localStorage ("calisigh-bg") */
-export const BG_MAP = {
-  barn: DefaultBackgrounds.Barn,
-  lakeside: DefaultBackgrounds.Lake,
-  peace: DefaultBackgrounds.Peace,
-  silos: DefaultBackgrounds.Silo,
-  summer: DefaultBackgrounds.Summer,
-  tree: DefaultBackgrounds.Tree,
-  fall: DefaultBackgrounds.Fall,
-  winter: DefaultBackgrounds.Winter,
-  sandstone: DefaultBackgrounds.Sandstone,
-  palestone: DefaultBackgrounds.PaleStone,
-  plasterwall: DefaultBackgrounds.PlasterWall,
-};
+/*
+The one list of built-in backgrounds. Settings shows a card for each, and getBackground looks the
+saved value up here. Add a new built-in picture here (and in backgroundImages/index.js) and it
+shows up everywhere. Values are what Settings saves to localStorage ("calisigh-bg").
+*/
+export const BACKGROUNDS = [
+  { label: "Barn", value: "barn", src: DefaultBackgrounds.Barn },
+  { label: "Lake", value: "lakeside", src: DefaultBackgrounds.Lake },
+  { label: "Peace", value: "peace", src: DefaultBackgrounds.Peace },
+  { label: "Silos", value: "silos", src: DefaultBackgrounds.Silo },
+  { label: "Summer", value: "summer", src: DefaultBackgrounds.Summer },
+  { label: "Tree", value: "tree", src: DefaultBackgrounds.Tree },
+  { label: "Fall", value: "fall", src: DefaultBackgrounds.Fall },
+  { label: "Winter", value: "winter", src: DefaultBackgrounds.Winter },
+  { label: "Sandstone", value: "sandstone", src: DefaultBackgrounds.Sandstone },
+  { label: "PaleStone", value: "palestone", src: DefaultBackgrounds.PaleStone },
+  { label: "PlasterWall", value: "plasterwall", src: DefaultBackgrounds.PlasterWall },
+  { label: "StaticSand", value: "staticsand", src: DefaultBackgrounds.StaticSand },
+];
 
-/* These three used to be custom uploads saved under prefixed names */
+export const BG_MAP = Object.fromEntries(BACKGROUNDS.map(bg => [bg.value, bg.src]));
+
+/* These used to be custom uploads saved under prefixed names */
 const RENAMED = {
   day_Sandstone: "sandstone",
   day_PaleStone: "palestone",
   night_PlasterWall: "plasterwall",
+  night_StaticSand: "staticsand",
 };
 
 export function saveBackground(key, customEntries) {

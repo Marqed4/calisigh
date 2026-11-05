@@ -55,7 +55,7 @@ export const THEMES = [
   { label: "Emerald plastic", finish: "plastic", color: "#4caf7d", accent: "#5eead4" },
   { label: "Midnight onyx", finish: "matte", color: "#2b2d3a", accent: "#7c83ff" },
   { label: "Violet glass", finish: "transparent", color: "#8e7cc3", accent: "#c4b5fd" },
-  { label: "Ocean pearl", finish: "pearl", color: "#7fb3d5", accent: "#38bdf8" },
+  { label: "Ocean pearl", finish: "stainless", color: "#7fb3d5", accent: "#38bdf8" },
   { label: "Sunset shimmer", finish: "shimmer", color: "#e0703f", accent: "#fbbf24" },
   { label: "Mint sparkle", finish: "sparkle", color: "#7fd8b5", accent: "#34d399" },
   { label: "Titanium", finish: "stainless", color: "#8d939f", accent: "#cbd5e1" },

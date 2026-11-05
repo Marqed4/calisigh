@@ -1,26 +1,58 @@
-.theme-picker {
+.theme-panel {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--panel);
+  backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
-.theme-picker .segmented {
-  flex-wrap: wrap;
+.theme-row--split {
+  justify-content: space-between;
+  gap: 8px 24px;
 }
 
-.theme-presets {
+.theme-group,
+.theme-opt {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
 }
 
-.theme-preset,
-.theme-match {
-  padding: 4px 10px;
-  font-size: 0.76rem;
+.theme-row-label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
 }
 
+.theme-chip {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+.theme-chip--active,
 .theme-match[aria-pressed="true"] {
   color: var(--accent);
   border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.theme-panel .settings-swatch {
+  width: 24px;
+  height: 24px;
+}
+
+.theme-opt .input {
+  width: 130px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
 }

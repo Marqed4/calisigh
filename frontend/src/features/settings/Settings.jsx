@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { DefaultBackgrounds } from "../appearance/backgroundImages/index.js";
 import { Close, Upload, Volume } from "../../shared/components/Icons.jsx";
 import { backgrounds, holidays as holidaysApi, sounds } from "../../shared/lib/api.js";
-import { saveBackground, savedBgKey } from "../appearance/backgrounds.js";
+import { BACKGROUNDS, saveBackground, savedBgKey } from "../appearance/backgrounds.js";
 import { appearance, holidayToggles } from "./settings.js";
 import { closeThisWindow } from "../../shared/lib/windows.js";
 import { applyFont, listFonts, saveFont, savedFont } from "../appearance/fonts.js";
@@ -14,19 +13,30 @@ import { applyTrim, saveTrim, savedTrim } from "../appearance/trim.js";
 import ThemePicker from "../appearance/ThemePicker.jsx";
 import "./Settings.css";
 
-const BG_MAP = [
-  { label: "Barn",   value: "barn",     src: DefaultBackgrounds.Barn },
-  { label: "Lake",   value: "lakeside", src: DefaultBackgrounds.Lake },
-  { label: "Peace",  value: "peace",    src: DefaultBackgrounds.Peace },
-  { label: "Silos",  value: "silos",    src: DefaultBackgrounds.Silo },
-  { label: "Summer", value: "summer",   src: DefaultBackgrounds.Summer },
-  { label: "Tree",   value: "tree",     src: DefaultBackgrounds.Tree },
-  { label: "Fall",   value: "fall",     src: DefaultBackgrounds.Fall },
-  { label: "Winter", value: "winter",   src: DefaultBackgrounds.Winter },
-  { label: "Sandstone",   value: "sandstone",   src: DefaultBackgrounds.Sandstone },
-  { label: "PaleStone",   value: "palestone",   src: DefaultBackgrounds.PaleStone },
-  { label: "PlasterWall", value: "plasterwall", src: DefaultBackgrounds.PlasterWall },
+const TABS = [
+  { key: "appearance", label: "Appearance" },
+  { key: "calendar", label: "Calendar" },
+  { key: "sound", label: "Alert sound" },
 ];
+
+const HINTS = {
+  appearance: "Theme changes preview as you click.",
+  calendar: "Press Save to keep your changes.",
+  sound: "Press Save to keep the chosen sound.",
+};
+
+function Toggle({ on, onClick, title }) {
+  return (
+    <button
+      className={`settings-toggle-btn ${on ? "settings-toggle-btn--on" : ""}`}
+      aria-pressed={on}
+      onClick={onClick}
+      title={title}
+    >
+      {on ? "On" : "Off"}
+    </button>
+  );
+}
 
 export default function Settings() {
 
@@ -36,6 +46,7 @@ export default function Settings() {
   const [font, setFont] = useState(savedFont);
   const [fonts, setFonts] = useState([]);
   const [keyStatus, setKeyStatus] = useState(null);
+  const [tab, setTab] = useState("appearance");
   const [trim, setTrim] = useState(savedTrim);
 
   /* Preview a trim change right away; Cancel puts the saved one back */
@@ -46,6 +57,9 @@ export default function Settings() {
   }
   const [look, setLook] = useState(appearance.read);
   const [customBackgrounds, setCustomBackgrounds] = useState([]);
+  /* What happened to the last background added, and pictures that would not load from disk */
+  const [bgMessage, setBgMessage] = useState(null);
+  const [brokenBgs, setBrokenBgs] = useState([]);
   const [customSounds, setCustomSounds] = useState([]);
   const [selectedSound, setSelectedSound] = useState(null);
   const [volume, setVolume] = useState(100);
@@ -56,13 +70,13 @@ export default function Settings() {
     selectedSoundRef.current = selectedSound;
   }, [selectedSound]);
 
-  const CURRENT_BACKGROUND = BG_MAP.find(b => b.value === selectedBg);
+  const CURRENT_BACKGROUND = BACKGROUNDS.find(b => b.value === selectedBg);
 
   const previewBg = CURRENT_BACKGROUND
     ? CURRENT_BACKGROUND.src
     : customBackgrounds.find(e => e.split("|&")[0] === selectedBg)
         ? convertFileSrc(customBackgrounds.find(e => e.split("|&")[0] === selectedBg).split("|&")[1])
-        : BG_MAP[0].src;
+        : BACKGROUNDS[0].src;
 
   useEffect(() => {
     listFonts().then(setFonts);
@@ -72,11 +86,17 @@ export default function Settings() {
     loadVolume();
   }, []);
 
+  /* Returns the list, or null when it could not be loaded (the old list stays on screen) */
   async function loadBackgrounds() {
     try {
-      setCustomBackgrounds(await backgrounds.list());
+      const list = await backgrounds.list();
+      if (!Array.isArray(list)) throw new Error("The server did not send a list.");
+      setCustomBackgrounds(list);
+      return list;
     } catch (err) {
       console.error("Failed to load backgrounds:", err);
+      setBgMessage({ kind: "error", text: "Could not load your added backgrounds. Is the server running?" });
+      return null;
     }
   }
 
@@ -113,23 +133,38 @@ export default function Settings() {
   }
 
   async function uploadBackground() {
+    setBgMessage(null);
     try {
       const path = await open({
         multiple: false,
         filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
       });
       if (!path) return;
-      await backgrounds.add(path);
+      const before = customBackgrounds.length;
+      const res = await backgrounds.add(path);
+      /* The route hands back the fetch response, so a 4xx or 5xx must not pass as success */
+      if (res && res.ok === false) {
+        const detail = (await res.text().catch(() => "")).trim().slice(0, 200);
+        throw new Error(detail || `The server answered ${res.status}.`);
+      }
       await new Promise(r => setTimeout(r, 300));
-      await loadBackgrounds();
+      const list = await loadBackgrounds();
+      if (!list) return;
+      const stem = String(path).split(/[\\/]/).pop().replace(/\.[^.]+$/, "").toLowerCase();
+      const shown = list.length > before || list.some(entry => entry.toLowerCase().includes(stem));
+      setBgMessage(shown
+        ? { kind: "note", text: "Added. Pick it, then press Save." }
+        : { kind: "error", text: "The server took the file, but it is not in the list. Its name or type may not be supported." });
     } catch (err) {
       console.error("Failed to upload background:", err);
+      setBgMessage({ kind: "error", text: `Could not add that picture. ${err.message ?? ""}`.trim() });
     }
   }
 
   async function removeBackground(entry) {
     const name = entry.split("|&")[0];
     if (selectedBg === name) setSelectedBg("fall");
+    setBrokenBgs(prev => prev.filter(n => n !== name));
     try {
       await backgrounds.remove(name);
       await loadBackgrounds();
@@ -200,6 +235,8 @@ export default function Settings() {
     await closeThisWindow();
   }
 
+  const flipLook = (name) => setLook(l => ({ ...l, [name]: !l[name] }));
+
   return (
     <>
       <div
@@ -207,230 +244,281 @@ export default function Settings() {
         style={{ backgroundImage: `url(${previewBg})` }}
       />
       <div className="settings-root">
+        <div className="settings-shell">
 
-        <div className="settings-main">
-          <div className="settings-main-body">
+          <nav className="settings-nav" aria-label="Settings sections">
             <h2 className="settings-title">Settings</h2>
-            <p className="settings-subtitle">Choose your background</p>
-
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Federal Holidays</span>
+            {TABS.map(t => (
               <button
-                className={`settings-toggle-btn ${toggles.federal ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => flip('federal')}
-                title="Show or hide US federal holidays"
+                key={t.key}
+                className={`settings-nav-item${tab === t.key ? " settings-nav-item--active" : ""}`}
+                aria-current={tab === t.key ? "page" : undefined}
+                onClick={() => setTab(t.key)}
               >
-                {toggles.federal ? "On" : "Off"}
+                {t.label}
               </button>
-            </div>
+            ))}
+          </nav>
 
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Observances</span>
-              <button
-                className={`settings-toggle-btn ${toggles.observance ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => flip('observance')}
-                title="Show or hide cultural observances like Earth Day, Halloween, etc."
-              >
-                {toggles.observance ? "On" : "Off"}
-              </button>
-            </div>
+          <div className="settings-main">
+            <div className="settings-main-body">
 
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Religious Observances</span>
-              <button
-                className={`settings-toggle-btn ${toggles.religious ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => flip('religious')}
-                title="Show or hide religious observances like Easter, Good Friday, Hanukkah, etc."
-              >
-                {toggles.religious ? "On" : "Off"}
-              </button>
-            </div>
+              {tab === "appearance" && (
+                <>
+                  <h3 className="settings-section-label">Theme</h3>
+                  <ThemePicker
+                    trim={trim}
+                    onChange={changeTrim}
+                    extra={
+                      <>
+                        <div className="theme-opt">
+                          <span className="theme-row-label">Blur</span>
+                          <Toggle
+                            on={look.cellBlur}
+                            onClick={() => flipLook("cellBlur")}
+                            title="Frosted glass effect behind the calendar cells and panels"
+                          />
+                        </div>
+                        <div className="theme-opt">
+                          <span className="theme-row-label">Sharp cells</span>
+                          <Toggle
+                            on={look.sharpCells}
+                            onClick={() => flipLook("sharpCells")}
+                            title="Square corners and crisp borders instead of rounded ones"
+                          />
+                        </div>
+                        <div className="theme-opt">
+                          <span className="theme-row-label">Font</span>
+                          <input
+                            className="input"
+                            list="settings-font-list"
+                            placeholder="Default"
+                            aria-label="Font"
+                            value={font}
+                            onChange={e => {
+                              setFont(e.target.value);
+                              if (e.target.value === "" || fonts.includes(e.target.value)) applyFont(e.target.value);
+                            }}
+                          />
+                          <datalist id="settings-font-list">
+                            {fonts.map(f => <option key={f} value={f} />)}
+                          </datalist>
+                          {font && <button className="settings-font-reset" onClick={() => { setFont(""); applyFont(""); }}>Default</button>}
+                        </div>
+                      </>
+                    }
+                  />
 
-            <div className="settings-holiday-key">
-              <span className="settings-toggle-label">
-                Holiday key {keyStatus && (keyStatus.set ? "(set)" : "(not set, holidays are off)")}
-              </span>
-              <HolidayKeyForm country={keyStatus?.country} onSaved={() => holidaysApi.keyStatus().then(setKeyStatus)} />
-            </div>
+                  <div className="settings-section-head">
+                    <h3 className="settings-section-label">Background</h3>
+                    <div className="settings-section-side">
+                      <span className="settings-section-note">{BACKGROUNDS.length} built in, plus your own</span>
+                      <button className="btn" onClick={uploadBackground}>Add picture</button>
+                    </div>
+                  </div>
 
-            <div className="settings-font-row">
-              <span className="settings-toggle-label">Font</span>
-              <input
-                className="input"
-                list="settings-font-list"
-                placeholder="Default"
-                value={font}
-                onChange={e => {
-                  setFont(e.target.value);
-                  if (e.target.value === "" || fonts.includes(e.target.value)) applyFont(e.target.value);
-                }}
-              />
-              <datalist id="settings-font-list">
-                {fonts.map(f => <option key={f} value={f} />)}
-              </datalist>
-              {font && <button className="settings-font-reset" onClick={() => { setFont(""); applyFont(""); }}>Default</button>}
-            </div>
+                  <div className="settings-bg-picker">
+                    {BACKGROUNDS.map(bg => (
+                      <div
+                        key={bg.value}
+                        className={`settings-bg-card ${selectedBg === bg.value ? "settings-bg-card--selected" : ""}`}
+                        onClick={() => setSelectedBg(bg.value)}
+                      >
+                        <img src={bg.src} alt={bg.label} className="settings-bg-img" />
+                        <span className="settings-bg-label">{bg.label}</span>
+                      </div>
+                    ))}
 
-            <ThemePicker trim={trim} onChange={changeTrim} />
+                    {customBackgrounds.map((entry, i) => {
+                      const name = entry.split("|&")[0];
+                      const path = entry.split("|&")[1];
+                      return (
+                        <div
+                          key={entry}
+                          className={`settings-bg-card ${selectedBg === name ? "settings-bg-card--selected" : ""}`}
+                          onClick={() => setSelectedBg(name)}
+                        >
+                          <img
+                            src={convertFileSrc(path)}
+                            alt={name}
+                            className="settings-bg-img"
+                            onError={() => setBrokenBgs(prev => (prev.includes(name) ? prev : [...prev, name]))}
+                          />
+                          <span className="settings-bg-label">{name}</span>
+                          <button
+                            className="settings-remove settings-bg-remove"
+                            aria-label={`Remove ${name}`}
+                            title="Remove"
+                            onClick={(e) => { e.stopPropagation(); removeBackground(entry); }}
+                          >
+                            <Close size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Blur behind cells</span>
-              <button
-                className={`settings-toggle-btn ${look.cellBlur ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setLook(l => ({ ...l, cellBlur: !l.cellBlur }))}
-                title="Frosted glass effect behind the calendar cells and panels"
-              >
-                {look.cellBlur ? "On" : "Off"}
-              </button>
-            </div>
+              {tab === "calendar" && (
+                <>
+                  <h3 className="settings-section-label">Holidays</h3>
 
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Sharp cells</span>
-              <button
-                className={`settings-toggle-btn ${look.sharpCells ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setLook(l => ({ ...l, sharpCells: !l.sharpCells }))}
-                title="Square corners and crisp borders instead of rounded ones"
-              >
-                {look.sharpCells ? "On" : "Off"}
-              </button>
-            </div>
+                  <div className="settings-toggle-row">
+                    <span className="settings-toggle-label">Federal Holidays</span>
+                    <Toggle
+                      on={toggles.federal}
+                      onClick={() => flip('federal')}
+                      title="Show or hide US federal holidays"
+                    />
+                  </div>
 
-            <div className="settings-toggle-row">
-              <span className="settings-toggle-label">Week starts on Monday</span>
-              <button
-                className={`settings-toggle-btn ${look.mondayStart ? "settings-toggle-btn--on" : ""}`}
-                onClick={() => setLook(l => ({ ...l, mondayStart: !l.mondayStart }))}
-                title="Show Monday as the first day of the week in the month, week and mini calendars"
-              >
-                {look.mondayStart ? "On" : "Off"}
-              </button>
-            </div>
+                  <div className="settings-toggle-row">
+                    <span className="settings-toggle-label">Observances</span>
+                    <Toggle
+                      on={toggles.observance}
+                      onClick={() => flip('observance')}
+                      title="Show or hide cultural observances like Earth Day, Halloween, etc."
+                    />
+                  </div>
 
-            <PresetsEditor />
+                  <div className="settings-toggle-row">
+                    <span className="settings-toggle-label">Religious Observances</span>
+                    <Toggle
+                      on={toggles.religious}
+                      onClick={() => flip('religious')}
+                      title="Show or hide religious observances like Easter, Good Friday, Hanukkah, etc."
+                    />
+                  </div>
 
-            <div className="settings-bg-picker">
-              {BG_MAP.map(bg => (
-                <div
-                  key={bg.value}
-                  className={`settings-bg-card ${selectedBg === bg.value ? "settings-bg-card--selected" : ""}`}
-                  onClick={() => setSelectedBg(bg.value)}
-                >
-                  <img src={bg.src} alt={bg.label} className="settings-bg-img" />
-                  <span className="settings-bg-label">{bg.label}</span>
-                </div>
-              ))}
+                  <div className="settings-holiday-key">
+                    <span className="settings-toggle-label">
+                      Holiday key {keyStatus && (keyStatus.set ? "(set)" : "(not set, holidays are off)")}
+                    </span>
+                    <HolidayKeyForm country={keyStatus?.country} onSaved={() => holidaysApi.keyStatus().then(setKeyStatus)} />
+                  </div>
 
-              {customBackgrounds.map((entry, i) => {
-                const name = entry.split("|&")[0];
-                const path = entry.split("|&")[1];
-                return (
-                  <div
-                    key={i}
-                    className={`settings-bg-card ${selectedBg === name ? "settings-bg-card--selected" : ""}`}
-                    onClick={() => setSelectedBg(name)}
-                  >
-                    <img src={convertFileSrc(path)} alt={name} className="settings-bg-img" />
-                    <span className="settings-bg-label">{name}</span>
-                    <button
-                      className="settings-remove settings-bg-remove"
-                      aria-label={`Remove ${name}`}
-                      title="Remove"
-                      onClick={(e) => { e.stopPropagation(); removeBackground(entry); }}
-                    >
-                      <Close size={12} />
+                  <h3 className="settings-section-label">Week</h3>
+
+                  <div className="settings-toggle-row">
+                    <span className="settings-toggle-label">Week starts on Monday</span>
+                    <Toggle
+                      on={look.mondayStart}
+                      onClick={() => flipLook("mondayStart")}
+                      title="Show Monday as the first day of the week in the month, week and mini calendars"
+                    />
+                  </div>
+
+                  <PresetsEditor />
+                </>
+              )}
+
+              {tab === "sound" && (
+                <>
+                  <div className="settings-section-head">
+                    <h3 className="settings-section-label">Alert sound</h3>
+                    <button className="btn" onClick={uploadSound}>
+                      <Upload size={14} />&nbsp;Add sound
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="settings-actions">
-            <button className="btn" onClick={uploadBackground}>
-              <Upload size={14} />&nbsp;Background
-            </button>
-            <button className="btn btn-primary" onClick={save}>Save</button>
+                  <div className="settings-volume-row">
+                    <span className="settings-volume-icon"><Volume size={16} /></span>
+                    <div className="settings-volume-slider-wrap">
+                      <input
+                        className="settings-volume-slider"
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={volume}
+                        aria-label="Volume"
+                        onChange={handleVolumeChange}
+                        style={{
+                          background: `linear-gradient(to right,
+                          rgba(255,255,255,0.85) ${volume}%,
+                          rgba(255,255,255,0.2) ${volume}%)`
+                        }}
+                      />
+                    </div>
+                    <span className="settings-volume-value">{volume}%</span>
+                  </div>
+
+                  <div className="settings-sounds-list">
+                    <div
+                      className={`settings-sound-card ${selectedSound === null ? "settings-sound-card-selected" : ""}`}
+                      onClick={() => {
+                        if (selectedSound === null) {
+                          stopSound();
+                        } else {
+                          setSelectedSound(null);
+                          previewSound("chime");
+                        }
+                      }}
+                    >
+                      <span>Default Chime</span>
+                    </div>
+
+                    {customSounds.map((entry, i) => {
+                      const name = entry.split("|&")[0];
+                      return (
+                        <div
+                          key={i}
+                          title={name}
+                          className={`settings-sound-card ${selectedSound === name ? "settings-sound-card-selected" : ""}`}
+                          onClick={() => {
+                            if (selectedSound === name) {
+                              stopSound();
+                            } else {
+                              setSelectedSound(name);
+                              previewSound(name);
+                            }
+                          }}
+                        >
+                          <span>{name}</span>
+                          <button
+                            className="settings-remove"
+                            aria-label={`Remove ${name}`}
+                            title="Remove"
+                            onClick={(e) => { e.stopPropagation(); removeSound(entry); }}
+                          >
+                            <Close size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {tab === "appearance" && (bgMessage || brokenBgs.length > 0) && (
+              <div className="settings-bg-message">
+                {bgMessage && (
+                  <p
+                    className={bgMessage.kind === "error" ? "form-error" : "settings-bg-note"}
+                    role={bgMessage.kind === "error" ? "alert" : "status"}
+                  >
+                    {bgMessage.text}
+                  </p>
+                )}
+                {brokenBgs.length > 0 && (
+                  <p className="form-error" role="alert">
+                    Could not load the picture for {brokenBgs.join(", ")}. If the file is there, the app may not be
+                    allowed to read its folder (the asset protocol scope in tauri.conf.json).
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="settings-actions">
+          <span className="settings-hint">{HINTS[tab]}</span>
+          <div className="settings-actions-buttons">
             <button className="btn" onClick={handleCancel}>Cancel</button>
+            <button className="btn btn-primary" onClick={save}>Save</button>
           </div>
         </div>
-
-        <div className="settings-sounds">
-          <div className="settings-sounds-body">
-            <h1 className="sound-subtitle">Alert Sound</h1>
-
-            <div className="settings-volume-row">
-              <span className="settings-volume-icon"><Volume size={16} /></span>
-              <div className="settings-volume-slider-wrap">
-                <input
-                  className="settings-volume-slider"
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  style={{
-                    background: `linear-gradient(to right,
-                    rgba(255,255,255,0.85) ${volume}%,
-                    rgba(255,255,255,0.2) ${volume}%)`
-                  }}
-                />
-              </div>
-              <span className="settings-volume-value">{volume}%</span>
-            </div>
-
-            <div className="settings-sounds-list">
-              <div
-                className={`settings-sound-card ${selectedSound === null ? "settings-sound-card-selected" : ""}`}
-                onClick={() => {
-                  if (selectedSound === null) {
-                    stopSound();
-                  } else {
-                    setSelectedSound(null);
-                    previewSound("chime");
-                  }
-                }}
-              >
-                <span>Default Chime</span>
-              </div>
-
-              {customSounds.map((entry, i) => {
-                const name = entry.split("|&")[0];
-                return (
-                  <div
-                    key={i}
-                    title={name}
-                    className={`settings-sound-card ${selectedSound === name ? "settings-sound-card-selected" : ""}`}
-                    onClick={() => {
-                      if (selectedSound === name) {
-                        stopSound();
-                      } else {
-                        setSelectedSound(name);
-                        previewSound(name);
-                      }
-                    }}
-                  >
-                    <span>{name}</span>
-                    <button
-                      className="settings-remove"
-                      aria-label={`Remove ${name}`}
-                      title="Remove"
-                      onClick={(e) => { e.stopPropagation(); removeSound(entry); }}
-                    >
-                      <Close size={12} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="settings-sounds-footer">
-            <button className="btn" onClick={uploadSound}>
-              <Upload size={14} />&nbsp;Add sound
-            </button>
-          </div>
-        </div>
-
       </div>
     </>
   );

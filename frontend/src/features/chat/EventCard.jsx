@@ -7,10 +7,12 @@ const formatWhen = (iso) => new Date(iso).toLocaleString([], {
 /*
 What the assistant proposes, always behind a button: a new event (kind "add"), a change to one
 (kind "edit") or removing one (kind "delete"). Nothing happens until the button is pressed.
-card is {kind, proposal | change, done}; busy and error are only for this session.
+card is {kind, proposal | change, done, undo, undone}; busy and error are only for this session.
+After the button is pressed, Undo reverses it (onUndo); a card without an undo record has no Undo.
 */
-export default function EventCard({ card, busy, error, onRun }) {
-  const { kind, done } = card;
+export default function EventCard({ card, busy, error, onRun, onUndo }) {
+  const { kind, done, undo, undone } = card;
+  const canUndo = done && !undone && Boolean(undo) && Boolean(onUndo);
   const item = kind === "add" ? card.proposal : card.change;
 
   const label = {
@@ -57,14 +59,22 @@ export default function EventCard({ card, busy, error, onRun }) {
         </>
       )}
 
-      {error && <p className="form-error">{error}</p>}
-      <button
-        className={`btn ${kind === "delete" ? "btn-danger" : "btn-primary"}`}
-        disabled={done || busy}
-        onClick={onRun}
-      >
-        {done ? label.done : busy ? label.busy : error ? "Try again" : label.idle}
-      </button>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="event-card-actions">
+        <button
+          className={`btn ${kind === "delete" ? "btn-danger" : "btn-primary"}`}
+          disabled={done || busy}
+          aria-busy={busy && !done}
+          onClick={onRun}
+        >
+          {undone ? "Undone" : done ? label.done : busy ? label.busy : error ? "Try again" : label.idle}
+        </button>
+        {canUndo && (
+          <button className="btn" disabled={busy} aria-busy={busy} onClick={onUndo}>
+            {busy ? "Undoing..." : error ? "Try undo again" : "Undo"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
