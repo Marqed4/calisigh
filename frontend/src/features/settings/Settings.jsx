@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Close, Upload, Volume } from "../../shared/components/Icons.jsx";
+import { ChevronLeft, ChevronRight, Close, Upload, Volume } from "../../shared/components/Icons.jsx";
 import { backgrounds, holidays as holidaysApi, sounds } from "../../shared/lib/api.js";
 import { BACKGROUNDS, saveBackground, savedBgKey } from "../appearance/backgrounds.js";
 import { appearance, holidayToggles } from "./settings.js";
@@ -38,6 +38,30 @@ function Toggle({ on, onClick, title }) {
   );
 }
 
+function CassetteArt({ compact = false, playing = false }) {
+  return (
+    <div
+      className={`settings-cassette-art${compact ? " settings-cassette-art--compact" : ""}${playing ? " settings-cassette-art--playing" : ""}`}
+      aria-hidden="true"
+    >
+      <span className="settings-cassette-screw settings-cassette-screw--tl" />
+      <span className="settings-cassette-screw settings-cassette-screw--tr" />
+      <div className="settings-cassette-window">
+        <span className="settings-cassette-reel"><i /></span>
+        <span className="settings-cassette-tape" />
+        <span className="settings-cassette-reel"><i /></span>
+      </div>
+      <span className="settings-cassette-label">
+        <span className="settings-cassette-label-line" />
+        <span className="settings-cassette-label-line settings-cassette-label-line--short" />
+      </span>
+      <span className="settings-cassette-slot" />
+      <span className="settings-cassette-screw settings-cassette-screw--bl" />
+      <span className="settings-cassette-screw settings-cassette-screw--br" />
+    </div>
+  );
+}
+
 export default function Settings() {
 
   const [selectedBg, setSelectedBg] = useState(savedBgKey);
@@ -62,9 +86,13 @@ export default function Settings() {
   const [brokenBgs, setBrokenBgs] = useState([]);
   const [customSounds, setCustomSounds] = useState([]);
   const [selectedSound, setSelectedSound] = useState(null);
+  const [previewingSound, setPreviewingSound] = useState(null);
+  const [deckLoad, setDeckLoad] = useState(0);
   const [volume, setVolume] = useState(100);
   const volumeDebounceRef = useRef(null);
   const selectedSoundRef = useRef(selectedSound);
+  const soundDeckRef = useRef(null);
+  const soundCarouselRef = useRef(null);
 
   useEffect(() => {
     selectedSoundRef.current = selectedSound;
@@ -190,7 +218,11 @@ export default function Settings() {
 
   async function removeSound(entry) {
     const name = entry.split("|&")[0];
-    if (selectedSound === name) setSelectedSound(null);
+    if (selectedSound === name) {
+      setSelectedSound(null);
+      setDeckLoad(n => n + 1);
+    }
+    if (previewingSound === name) stopSound();
     try {
       await sounds.remove(name);
       await loadSounds();
@@ -204,15 +236,84 @@ export default function Settings() {
       await sounds.stop();
     } catch (err) {
       console.error("Failed to stop sound:", err);
+    } finally {
+      setPreviewingSound(null);
     }
   }
 
   async function previewSound(name) {
     try {
       await sounds.play(name);
+      setPreviewingSound(name);
     } catch (err) {
+      setPreviewingSound(null);
       console.error("Failed to preview sound:", err);
     }
+  }
+
+  function animateSoundIntoDeck(tile) {
+    const deck = soundDeckRef.current;
+    if (!tile || !deck || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const from = tile.getBoundingClientRect();
+    const to = deck.getBoundingClientRect();
+    const flight = tile.cloneNode(true);
+    flight.setAttribute("aria-hidden", "true");
+    flight.tabIndex = -1;
+    Object.assign(flight.style, {
+      position: "fixed",
+      left: `${from.left}px`,
+      top: `${from.top}px`,
+      width: `${from.width}px`,
+      height: `${from.height}px`,
+      margin: "0",
+      zIndex: "9999",
+      pointerEvents: "none",
+    });
+    flight.classList.add("settings-sound-flight");
+    document.body.appendChild(flight);
+
+    const animation = flight.animate(
+      [
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+        {
+          transform: `translate(${to.left + to.width / 2 - from.left - from.width / 2}px, ${to.top + to.height / 2 - from.top - from.height / 2}px) scale(0.18)`,
+          opacity: 0.08,
+        },
+      ],
+      { duration: 540, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+    animation.onfinish = () => flight.remove();
+    animation.oncancel = () => flight.remove();
+  }
+
+  function chooseSound(track, event) {
+    if (selectedSound !== track.value) {
+      animateSoundIntoDeck(event.currentTarget);
+      setSelectedSound(track.value);
+      setDeckLoad(n => n + 1);
+    }
+
+    if (previewingSound === track.previewName) stopSound();
+    else previewSound(track.previewName);
+  }
+
+  function scrollSoundTiles(direction) {
+    const carousel = soundCarouselRef.current;
+    if (!carousel) return;
+    const max = carousel.scrollWidth - carousel.clientWidth;
+    if (max <= 1) return;
+
+    const atStart = carousel.scrollLeft <= 1;
+    const atEnd = carousel.scrollLeft >= max - 1;
+    const tileWidth = carousel.querySelector(".settings-sound-tile")?.getBoundingClientRect().width ?? 170;
+    const destination = direction < 0 && atStart
+      ? max
+      : direction > 0 && atEnd
+        ? 0
+        : carousel.scrollLeft + direction * (tileWidth + 10);
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    carousel.scrollTo({ left: destination, behavior });
   }
 
   async function save() {
@@ -236,6 +337,15 @@ export default function Settings() {
   }
 
   const flipLook = (name) => setLook(l => ({ ...l, [name]: !l[name] }));
+  const soundTracks = [
+    { key: "default-chime", value: null, previewName: "chime", label: "Default Chime", kind: "BUILT IN" },
+    ...customSounds.map(entry => {
+      const name = entry.split("|&")[0];
+      return { key: entry, value: name, previewName: name, label: name, kind: "YOUR TAPE", entry };
+    }),
+  ];
+  const loadedTrack = soundTracks.find(track => track.value === selectedSound) ?? soundTracks[0];
+  const isDeckPlaying = previewingSound === loadedTrack.previewName;
 
   return (
     <>
@@ -422,70 +532,103 @@ export default function Settings() {
                     </button>
                   </div>
 
-                  <div className="settings-volume-row">
-                    <span className="settings-volume-icon"><Volume size={16} /></span>
-                    <div className="settings-volume-slider-wrap">
-                      <input
-                        className="settings-volume-slider"
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={volume}
-                        aria-label="Volume"
-                        onChange={handleVolumeChange}
-                        style={{
-                          background: `linear-gradient(to right,
-                          rgba(255,255,255,0.85) ${volume}%,
-                          rgba(255,255,255,0.2) ${volume}%)`
-                        }}
-                      />
+                  <div className="settings-tape-player">
+                    <div className="settings-tape-shell" ref={soundDeckRef}>
+                      <CassetteArt playing={isDeckPlaying} />
+                      <div className="settings-tape-label" key={deckLoad}>
+                        <span className={`settings-tape-status${isDeckPlaying ? " settings-tape-status--playing" : ""}`}>
+                          {isDeckPlaying ? "NOW PLAYING" : "ON DECK"}
+                        </span>
+                        <strong title={loadedTrack.label}>{loadedTrack.label}</strong>
+                      </div>
                     </div>
-                    <span className="settings-volume-value">{volume}%</span>
+                    <div className="settings-tape-copy">
+                      <span className="settings-tape-kicker">CALISIGH TAPE DECK</span>
+                      <h4>{isDeckPlaying ? "Now spinning" : "Ready when you are"}</h4>
+                      <p>Pick a tape below to load it and hear a preview.</p>
+                      <div className="settings-volume-row">
+                        <span className="settings-volume-icon"><Volume size={16} /></span>
+                        <div className="settings-volume-slider-wrap">
+                          <input
+                            className="settings-volume-slider"
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={volume}
+                            aria-label="Volume"
+                            onChange={handleVolumeChange}
+                            style={{
+                              background: `linear-gradient(to right,
+                              rgba(255,255,255,0.85) ${volume}%,
+                              rgba(255,255,255,0.2) ${volume}%)`
+                            }}
+                          />
+                        </div>
+                        <span className="settings-volume-value">{volume}%</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="settings-sounds-list">
-                    <div
-                      className={`settings-sound-card ${selectedSound === null ? "settings-sound-card-selected" : ""}`}
-                      onClick={() => {
-                        if (selectedSound === null) {
-                          stopSound();
-                        } else {
-                          setSelectedSound(null);
-                          previewSound("chime");
-                        }
-                      }}
-                    >
-                      <span>Default Chime</span>
+                  <div className="settings-sound-library">
+                    <div className="settings-sound-library-heading">
+                      <span>YOUR TAPE COLLECTION</span>
+                      <span>{soundTracks.length} TRACKS · LOOPING</span>
                     </div>
-
-                    {customSounds.map((entry, i) => {
-                      const name = entry.split("|&")[0];
-                      return (
-                        <div
-                          key={i}
-                          title={name}
-                          className={`settings-sound-card ${selectedSound === name ? "settings-sound-card-selected" : ""}`}
-                          onClick={() => {
-                            if (selectedSound === name) {
-                              stopSound();
-                            } else {
-                              setSelectedSound(name);
-                              previewSound(name);
-                            }
-                          }}
-                        >
-                          <span>{name}</span>
-                          <button
-                            className="settings-remove"
-                            aria-label={`Remove ${name}`}
-                            title="Remove"
-                            onClick={(e) => { e.stopPropagation(); removeSound(entry); }}
-                          >
-                            <Close size={12} />
-                          </button>
+                    <div className="settings-sound-carousel">
+                      <button
+                        type="button"
+                        className="settings-sound-nav"
+                        aria-label="Previous sounds"
+                        title="Previous sounds"
+                        disabled={soundTracks.length < 3}
+                        onClick={() => scrollSoundTiles(-1)}
+                      >
+                        <ChevronLeft size={17} />
+                      </button>
+                      <div className="settings-sound-viewport" ref={soundCarouselRef}>
+                        <div className="settings-sound-track">
+                          {soundTracks.map(track => {
+                            const selected = selectedSound === track.value;
+                            const playing = previewingSound === track.previewName;
+                            return (
+                              <div className="settings-sound-tile" key={track.key}>
+                                <button
+                                  type="button"
+                                  className={`settings-sound-tile-button${selected ? " settings-sound-tile-button--selected" : ""}`}
+                                  aria-pressed={selected}
+                                  title={track.label}
+                                  onClick={event => chooseSound(track, event)}
+                                >
+                                  <CassetteArt compact playing={playing} />
+                                  <span className="settings-sound-tile-name">{track.label}</span>
+                                  <span className="settings-sound-tile-kind">{track.kind}</span>
+                                </button>
+                                {track.entry && (
+                                  <button
+                                    className="settings-remove settings-sound-remove"
+                                    aria-label={`Remove ${track.label}`}
+                                    title="Remove"
+                                    onClick={() => removeSound(track.entry)}
+                                  >
+                                    <Close size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                      <button
+                        type="button"
+                        className="settings-sound-nav"
+                        aria-label="Next sounds"
+                        title="Next sounds"
+                        disabled={soundTracks.length < 3}
+                        onClick={() => scrollSoundTiles(1)}
+                      >
+                        <ChevronRight size={17} />
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

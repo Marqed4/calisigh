@@ -15,7 +15,7 @@
 [data-depth="on"] .chip,
 [data-depth="on"] .settings-toggle-btn,
 [data-depth="on"] .settings-bg-card,
-[data-depth="on"] .settings-sound-card,
+[data-depth="on"] .settings-sound-tile-button,
 [data-depth="on"] .settings-toggle-row,
 [data-depth="on"] .theme-panel {
   --depth-lift:
@@ -38,7 +38,7 @@
 [data-depth="on"] .chip:hover,
 [data-depth="on"] .settings-toggle-btn:hover,
 [data-depth="on"] .settings-bg-card:hover,
-[data-depth="on"] .settings-sound-card:hover {
+[data-depth="on"] .settings-sound-tile-button:hover {
   --depth-lift:
     var(--depth-edge-light),
     var(--depth-edge-dark),
@@ -53,7 +53,7 @@
 [data-depth="on"] .chip:active,
 [data-depth="on"] .settings-toggle-btn:active,
 [data-depth="on"] .settings-bg-card:active,
-[data-depth="on"] .settings-sound-card:active {
+[data-depth="on"] .settings-sound-tile-button:active {
   --depth-lift:
     inset 0 2px 5px rgba(0, 0, 0, 0.45),
     0 1px 1px rgba(0, 0, 0, 0.3);
@@ -65,7 +65,7 @@
 [data-depth="on"] .theme-chip--active,
 [data-depth="on"] .theme-match[aria-pressed="true"],
 [data-depth="on"] .settings-bg-card--selected,
-[data-depth="on"] .settings-sound-card-selected {
+[data-depth="on"] .settings-sound-tile-button--selected {
   --depth-lift:
     inset 0 2px 5px rgba(0, 0, 0, 0.4),
     0 0 8px -2px color-mix(in srgb, var(--accent) 50%, transparent);
@@ -98,7 +98,7 @@
   [data-depth="on"] .chip,
   [data-depth="on"] .settings-toggle-btn,
   [data-depth="on"] .settings-bg-card,
-  [data-depth="on"] .settings-sound-card {
+  [data-depth="on"] .settings-sound-tile-button {
     transition: none;
     translate: none;
   }
