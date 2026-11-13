@@ -9,6 +9,8 @@ export const isActive = (f) =>
 /* Same key the views use to look an alarm up in the matched set */
 export const matchKey = (a) => a.id ?? a.time;
 
+const longDate = new Intl.DateTimeFormat([], { weekday: "long", month: "long" });
+
 /* Everything a word can match: title, notes, "09:30", "9:30 AM", "2026-11-05", "11/5/2026", "Thursday", "November" */
 function haystack(a) {
   const d = new Date(a.time);
@@ -19,7 +21,7 @@ function haystack(a) {
     formatTime(a.time),
     a.time.slice(0, 10),
     `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`,
-    d.toLocaleDateString([], { weekday: "long", month: "long" }),
+    longDate.format(d),
   ].join(" ").toLowerCase();
 }
 

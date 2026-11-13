@@ -1,8 +1,7 @@
-import { forwardRef, useEffect, useLayoutEffect, useRef } from "react";
-import { moneyPattern } from "./money.js";
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { amountMatches } from "./money.js";
+import { splitUrls } from "./urls.js";
 import "./HighlightInput.css";
-
-const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
 
 /* Whatever shapes the text must match the field exactly, or the colours drift off the letters */
 const MIRRORED = [
@@ -14,19 +13,20 @@ const MIRRORED = [
 /* Web addresses and currency amounts, coloured only (no bold, no size change) so the letters stay aligned */
 function highlight(text) {
   const out = [];
-  text.split(URL_PATTERN).forEach((part, i) => {
-    if (i % 2 === 1) {
-      out.push(<span key={`u${i}`} className="hl-url">{part}</span>);
-      return;
+  for (const piece of splitUrls(text)) {
+    if (piece.kind === "url") {
+      out.push(<span key={`u${piece.index}`} className="hl-url">{piece.text}</span>);
+      continue;
     }
     let last = 0;
-    for (const m of part.matchAll(moneyPattern())) {
-      if (m.index > last) out.push(part.slice(last, m.index));
-      out.push(<span key={`m${i}-${m.index}`} className="hl-money">{m[0]}</span>);
-      last = m.index + m[0].length;
+    for (const m of amountMatches(piece.text)) {
+      if (m.index > last) out.push(piece.text.slice(last, m.index));
+      const className = m.text.startsWith("-") ? "hl-money hl-money-negative" : "hl-money";
+      out.push(<span key={`m${piece.index + m.index}`} className={className}>{m.text}</span>);
+      last = m.index + m.text.length;
     }
-    if (last < part.length) out.push(part.slice(last));
-  });
+    if (last < piece.text.length) out.push(piece.text.slice(last));
+  }
   return out;
 }
 
@@ -34,6 +34,7 @@ function highlight(text) {
 A text field that colours amounts and links while you type. The real field keeps its own
 look, caret and selection, with its text made invisible; a copy of the text, coloured, is
 laid exactly over it. multiline gives a textarea, otherwise a one line input.
+value is required: the field's own letters are invisible, so without it nothing would show.
 */
 const HighlightInput = forwardRef(function HighlightInput(
   { multiline = false, value, className = "", wrapClassName = "", ...rest }, ref
@@ -41,11 +42,12 @@ const HighlightInput = forwardRef(function HighlightInput(
   const field = useRef(null);
   const back = useRef(null);
 
-  function setRefs(node) {
+  /* Stable between renders, so a caller's own ref is not cleared and set again on every keystroke */
+  const setRefs = useCallback((node) => {
     field.current = node;
     if (typeof ref === "function") ref(node);
     else if (ref) ref.current = node;
-  }
+  }, [ref]);
 
   function sync() {
     const f = field.current;

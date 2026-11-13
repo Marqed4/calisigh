@@ -24,6 +24,7 @@
   --accent-strong: color-mix(in srgb, var(--accent) 34%, transparent);
   --on-accent: #0c1220;
   --holiday: #ffd479;
+  --money: #4caf7d;
   --danger: #ff8a8a;
 
   --radius-sm: 6px;
@@ -170,13 +171,13 @@ button {
 }
 
 .btn-danger {
-  background: rgba(255, 138, 138, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   border-color: transparent;
   color: var(--danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: rgba(255, 138, 138, 0.28);
+  background: color-mix(in srgb, var(--danger) 28%, transparent);
   border-color: transparent;
 }
 
@@ -223,8 +224,8 @@ button {
 .form-error {
   font-size: 0.78rem;
   color: var(--danger);
-  background: rgba(255, 138, 138, 0.1);
-  border: 1px solid rgba(255, 138, 138, 0.3);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   border-radius: var(--radius-sm);
   padding: 5px 8px;
 }
@@ -298,14 +299,15 @@ button {
   box-shadow: var(--trim-shadow);
 }
 
-/* Scrollbars are just a thin line in the trim */
+/* Slim, rounded scrollbars follow the selected trim */
 * {
   scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--trim) 68%, transparent) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 10px;
+  height: 10px;
 }
 
 *::-webkit-scrollbar-button {
@@ -321,7 +323,14 @@ button {
 
 *::-webkit-scrollbar-thumb {
   background: var(--trim-fill);
-  border-radius: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  transition: filter 0.15s;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.25);
 }
 
 /* More finishes. Each one sets the same variables as the finishes above; shimmer and sparkle also

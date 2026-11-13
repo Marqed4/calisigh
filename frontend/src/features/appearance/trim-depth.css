@@ -1,0 +1,105 @@
+/* Depth: buttons, cells and chips stand up off the page, lift when hovered and press in when clicked.
+   On when the Depth setting is Soft or Strong (data-depth="on"). --depth-amount is 1 for Soft, 1.8 for Strong.
+   Each element sets --depth-lift, and box-shadow reads it. trim-glow.css adds the same variable to its
+   own shadows, so depth and glow stack instead of replacing each other.
+   Movement uses the separate `translate` property so it never fights a transform set elsewhere. */
+
+[data-depth="on"] {
+  --depth-edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 12px 14px -12px rgba(255, 255, 255, 0.2);
+  --depth-edge-dark: inset 0 -2px 0 rgba(0, 0, 0, 0.28);
+}
+
+/* Raised things */
+[data-depth="on"] .btn,
+[data-depth="on"] .cell,
+[data-depth="on"] .chip,
+[data-depth="on"] .settings-toggle-btn,
+[data-depth="on"] .settings-bg-card,
+[data-depth="on"] .settings-sound-card,
+[data-depth="on"] .settings-toggle-row,
+[data-depth="on"] .theme-panel {
+  --depth-lift:
+    var(--depth-edge-light),
+    var(--depth-edge-dark),
+    0 1px 1px rgba(0, 0, 0, 0.4),
+    0 calc(3px * var(--depth-amount)) calc(8px * var(--depth-amount)) rgba(0, 0, 0, 0.35);
+  box-shadow: var(--depth-lift);
+  transition:
+    box-shadow 0.15s ease,
+    translate 0.15s ease,
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+/* Pop out on hover */
+[data-depth="on"] .btn:hover:not(:disabled),
+[data-depth="on"] .cell:hover,
+[data-depth="on"] .chip:hover,
+[data-depth="on"] .settings-toggle-btn:hover,
+[data-depth="on"] .settings-bg-card:hover,
+[data-depth="on"] .settings-sound-card:hover {
+  --depth-lift:
+    var(--depth-edge-light),
+    var(--depth-edge-dark),
+    0 2px 2px rgba(0, 0, 0, 0.4),
+    0 calc(8px * var(--depth-amount)) calc(18px * var(--depth-amount)) rgba(0, 0, 0, 0.45);
+  translate: 0 calc(-2px * var(--depth-amount));
+  z-index: 2;
+}
+
+/* Press in on click */
+[data-depth="on"] .btn:active:not(:disabled),
+[data-depth="on"] .chip:active,
+[data-depth="on"] .settings-toggle-btn:active,
+[data-depth="on"] .settings-bg-card:active,
+[data-depth="on"] .settings-sound-card:active {
+  --depth-lift:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    0 1px 1px rgba(0, 0, 0, 0.3);
+  translate: 0 1px;
+}
+
+/* Switches that are on sit pushed in, in the accent colour */
+[data-depth="on"] .settings-toggle-btn--on,
+[data-depth="on"] .theme-chip--active,
+[data-depth="on"] .theme-match[aria-pressed="true"],
+[data-depth="on"] .settings-bg-card--selected,
+[data-depth="on"] .settings-sound-card-selected {
+  --depth-lift:
+    inset 0 2px 5px rgba(0, 0, 0, 0.4),
+    0 0 8px -2px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* Primary buttons carry a coloured shadow */
+[data-depth="on"] .btn-primary:not(:disabled) {
+  --depth-lift:
+    var(--depth-edge-light),
+    var(--depth-edge-dark),
+    0 calc(4px * var(--depth-amount)) calc(12px * var(--depth-amount)) color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Today: the cell stands a little higher than its neighbours */
+[data-depth="on"] .cell-today,
+[data-depth="on"] .week-col-today {
+  translate: 0 calc(-1px * var(--depth-amount));
+}
+
+/* Fields are cut into the surface instead of raised */
+[data-depth="on"] .input,
+[data-depth="on"] input[type="text"],
+[data-depth="on"] textarea {
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4), inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-depth="on"] .btn,
+  [data-depth="on"] .cell,
+  [data-depth="on"] .chip,
+  [data-depth="on"] .settings-toggle-btn,
+  [data-depth="on"] .settings-bg-card,
+  [data-depth="on"] .settings-sound-card {
+    transition: none;
+    translate: none;
+  }
+}

@@ -1,33 +1,32 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Money from "./Money.jsx";
-
-const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]'"]+$/;
+import { splitUrls } from "./urls.js";
 
 /* Text with its web addresses turned into links that open in the default browser, and its currency amounts highlighted. Only http and https are linked. */
 export default function Linkified({ text }) {
   if (!text) return null;
 
-  return text.split(URL_PATTERN).map((part, i) => {
-    if (i % 2 === 0) return <Money key={i} text={part} />;
-    const url = part.replace(TRAILING_PUNCTUATION, "");
-    const rest = part.slice(url.length);
+  return splitUrls(text).map((piece) => {
+    if (piece.kind === "text") return <Money key={piece.index} text={piece.text} />;
+    const url = piece.text;
+    const stop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
     return (
-      <span key={i}>
-        <a
-          href={url}
-          className="link"
-          title={url}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openUrl(url).catch(() => {});
-          }}
-        >
-          {url}
-        </a>
-        {rest}
-      </span>
+      <a
+        key={piece.index}
+        href={url}
+        className="link"
+        title={url}
+        onClick={(e) => {
+          stop(e);
+          openUrl(url).catch((err) => console.warn("Could not open link", url, err));
+        }}
+        onAuxClick={stop}
+      >
+        {url}
+      </a>
     );
   });
 }

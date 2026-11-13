@@ -39,10 +39,25 @@
   color: var(--money, #4caf7d);
 }
 
+.hl-money-negative {
+  color: var(--danger, #ff8a8a);
+}
+
 .hl-url {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Windows high contrast replaces every colour, so the field shows its own letters and the copy steps aside */
+@media (forced-colors: active) {
+  .hl-field {
+    color: FieldText !important;
+  }
+
+  .hl-back {
+    display: none;
+  }
 }
 
 /* Running total under the description while typing */

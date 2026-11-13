@@ -1,9 +1,13 @@
-/* Change --money to recolour every amount */
+/* Change --money to recolour positive amounts */
 .money {
   color: var(--money, #4caf7d);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.money-negative {
+  color: var(--danger, #ff8a8a);
 }
 
 .money-symbol {

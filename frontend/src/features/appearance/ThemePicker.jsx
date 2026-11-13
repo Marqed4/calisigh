@@ -6,7 +6,7 @@ const same = (a, b) => a?.toLowerCase() === b.toLowerCase();
 const SHOWN = 5;
 
 /*
-The Theme panel: ready-made combinations, finish, trim and accent colours, glow.
+The Theme panel: ready-made combinations, finish, trim and accent colours, glow, depth.
 onChange gets the changed fields. `extra` is more options for the last row (Settings puts
 blur, sharp cells and font there). Wrap each one in <div className="theme-opt">.
 */
@@ -115,6 +115,17 @@ export default function ThemePicker({ trim, onChange, extra }) {
             onClick={() => onChange({ glow: trim.glow === false })}
           >
             {trim.glow !== false ? "On" : "Off"}
+          </button>
+        </div>
+        <div className="theme-opt">
+          <span className="theme-row-label">Depth</span>
+          <button
+            className={`settings-toggle-btn ${trim.depth === true ? "settings-toggle-btn--on" : ""}`}
+            aria-pressed={trim.depth === true}
+            title="Buttons, cells and chips stand up, lift when hovered and press in when clicked"
+            onClick={() => onChange({ depth: trim.depth !== true })}
+          >
+            {trim.depth === true ? "On" : "Off"}
           </button>
         </div>
         {extra}

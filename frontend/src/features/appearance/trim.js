@@ -1,15 +1,18 @@
+import "./trim-depth.css";
 import "./trim-glow.css";
 /*
 The theme is three picks (a finish, a trim colour and an accent colour) plus a glow switch.
 The trim is the thin line work of the interface: borders, the scrollbar line and the edge
 shading on cells and buttons. The accent is the highlight colour (today, primary buttons,
-active switches). The glow is a soft accent-coloured halo on today and on event chips (trim-glow.css). App.css turns the finish (data-trim), trim colour (--trim) and accent
+active switches). The glow is a soft accent-coloured halo on today and on event chips (trim-glow.css). Depth makes buttons, cells and
+chips stand up, lift on hover and press in (trim-depth.css). App.css turns the finish (data-trim), trim colour (--trim) and accent
 (--accent) into the actual look.
 */
 const FINISH_KEY = "calisigh-trim-finish";
 const COLOR_KEY = "calisigh-trim-color";
 const ACCENT_KEY = "calisigh-accent";
 const GLOW_KEY = "calisigh-glow";
+const DEPTH_KEY = "calisigh-depth";
 
 export const FINISHES = [
   { key: "matte", label: "Matte" },
@@ -21,6 +24,9 @@ export const FINISHES = [
   { key: "sparkle", label: "Sparkle" },
   { key: "transparent", label: "Glass" },
 ];
+
+/* How far things lift when Depth is on: scales the shadows and the hover lift in trim-depth.css (--depth-amount) */
+const DEPTH_AMOUNT = 1.4;
 
 export const SWATCHES = [
   { color: "#9aa0b4", label: "Steel" },
@@ -69,8 +75,8 @@ export const THEMES = [
   { label: "Forest stone", finish: "stone", color: "#4a6b55", accent: "#86efac" },
 ];
 
-/* accent is a hex colour, or "match" to follow the trim colour; glow is on unless it is false */
-export const DEFAULT_TRIM = { finish: "matte", color: SWATCHES[0].color, accent: ACCENTS[0].color, glow: true };
+/* accent is a hex colour, or "match" to follow the trim colour; glow is on unless it is false; depth is off unless it is true */
+export const DEFAULT_TRIM = { finish: "matte", color: SWATCHES[0].color, accent: ACCENTS[0].color, glow: true, depth: false };
 
 const isHex = (value) => /^#[0-9a-f]{6}$/i.test(value ?? "");
 
@@ -83,14 +89,16 @@ export function savedTrim() {
     color: isHex(color) ? color : DEFAULT_TRIM.color,
     accent: accent === "match" || isHex(accent) ? accent : DEFAULT_TRIM.accent,
     glow: localStorage.getItem(GLOW_KEY) !== "false",
+    depth: localStorage.getItem(DEPTH_KEY) === "true",
   };
 }
 
-export function saveTrim({ finish, color, accent, glow }) {
+export function saveTrim({ finish, color, accent, glow, depth }) {
   localStorage.setItem(FINISH_KEY, finish);
   localStorage.setItem(COLOR_KEY, color);
   localStorage.setItem(ACCENT_KEY, accent);
   if (glow !== undefined) localStorage.setItem(GLOW_KEY, String(glow !== false));
+  if (depth !== undefined) localStorage.setItem(DEPTH_KEY, String(depth === true));
 }
 
 /* Dark text on light accents, white text on dark ones, so "today" and primary buttons stay readable */
@@ -104,6 +112,8 @@ export function applyTrim(trim = savedTrim()) {
   const root = document.documentElement;
   root.dataset.trim = trim.finish;
   root.dataset.glow = trim.glow === false ? "off" : "on";
+  root.dataset.depth = trim.depth === true ? "on" : "off";
+  root.style.setProperty("--depth-amount", String(DEPTH_AMOUNT));
   root.style.setProperty("--trim", trim.color);
   root.style.setProperty("--accent", accent);
   root.style.setProperty("--on-accent", onAccent(accent));
@@ -112,8 +122,8 @@ export function applyTrim(trim = savedTrim()) {
 /* Applies the saved theme now and again whenever another window changes it */
 export function keepTrimApplied() {
   applyTrim();
-  const keys = [FINISH_KEY, COLOR_KEY, ACCENT_KEY, GLOW_KEY];
+  const keys = [FINISH_KEY, COLOR_KEY, ACCENT_KEY, GLOW_KEY, DEPTH_KEY];
   const onStorage = (e) => { if (keys.includes(e.key)) applyTrim(); };
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);
-}
+}

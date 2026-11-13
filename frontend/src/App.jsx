@@ -14,17 +14,26 @@ export default function App() {
   useEffect(keepFontApplied, []);
   useEffect(keepTrimApplied, []);
 
+  /* Leave full screen as soon as the window is resized into it. The listener is removed when the app unmounts. */
   useEffect(() => {
-    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-      const win = getCurrentWindow();
-      let unlisten;
-      win.onResized(async () => {
-        if (await win.isFullscreen()) {
-          await win.setFullscreen(false);
-        }
-      }).then(f => { unlisten = f; });
-      return () => { if (unlisten) unlisten(); };
-    });
+    let cancelled = false;
+    let unlisten;
+    import("@tauri-apps/api/window")
+      .then(async ({ getCurrentWindow }) => {
+        const win = getCurrentWindow();
+        const stop = await win.onResized(async () => {
+          if (await win.isFullscreen()) {
+            await win.setFullscreen(false);
+          }
+        });
+        if (cancelled) stop();
+        else unlisten = stop;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
   }, []);
 
   return (
