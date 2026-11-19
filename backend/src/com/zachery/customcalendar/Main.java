@@ -59,6 +59,9 @@ public class Main
         new ChatHistory().register();
         new Models().register();
 
+        // Stop any playing sound when the process exits
+        Runtime.getRuntime().addShutdownHook(new Thread(alarmSounds::stopSound));
+
         // Start watching for alarms that are due
         dateAlarm.checkAlarm();
 
