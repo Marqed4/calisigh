@@ -2,7 +2,7 @@
   position: relative;
 }
 
-/* The field keeps its background, caret and selection; only its letters are hidden */
+/* Field: letters hidden, caret and selection kept */
 .hl-field {
   display: block;
   color: transparent !important;
@@ -13,12 +13,11 @@
   color: var(--text-faint);
 }
 
-/* The coloured copy sits on top and lets every click through */
+/* Coloured copy on top, click-through */
 .hl-back {
   position: absolute;
   inset: 0;
   z-index: 1;
-  margin: 0;
   overflow: hidden;
   pointer-events: none;
   border-style: solid;
@@ -36,11 +35,11 @@
 }
 
 .hl-money {
-  color: var(--money, #4caf7d);
+  color: var(--money);
 }
 
 .hl-money-negative {
-  color: var(--danger, #ff8a8a);
+  color: var(--danger);
 }
 
 .hl-url {
@@ -49,7 +48,7 @@
   text-underline-offset: 2px;
 }
 
-/* Windows high contrast replaces every colour, so the field shows its own letters and the copy steps aside */
+/* High contrast: show the field's own letters */
 @media (forced-colors: active) {
   .hl-field {
     color: FieldText !important;
@@ -60,9 +59,9 @@
   }
 }
 
-/* Running total under the description while typing */
+/* Running total */
 .alarm-money-total {
   margin: -4px 0 0;
   font-size: 0.76rem;
-  color: var(--money, #4caf7d);
+  color: var(--money);
 }
